@@ -24,7 +24,9 @@ RUN groupadd --system arkana && \
     useradd --system --gid arkana --no-create-home arkana
 
 RUN mkdir -p /home/arkana/.postgresql
+
 COPY src/main/resources/certs/supabase-prod-ca-2021.crt /home/arkana/.postgresql/root.crt
+
 RUN chown arkana:arkana /home/arkana/.postgresql/root.crt && \
     chmod 600 /home/arkana/.postgresql/root.crt \
     
