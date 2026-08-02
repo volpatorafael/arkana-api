@@ -108,9 +108,6 @@ public class RepositoryQueryLoggingAspect {
         if (value instanceof CharSequence) {
             return "[TEXT]";
         }
-        if (value instanceof ProfileEntity) {
-            return "ProfileEntity";
-        }
         if (value instanceof Pageable pageable) {
             return pageable;
         }
