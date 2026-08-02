@@ -25,11 +25,10 @@ RUN groupadd --system arkana && \
 
 RUN mkdir -p /home/arkana/.postgresql
 
-COPY src/main/resources/certs/supabase-prod-ca-2021.crt /home/arkana/.postgresql/root.crt
+COPY --chown=arkana:arkana src/main/resources/certs/supabase-prod-ca-2021.crt /home/arkana/.postgresql/root.crt
 
-RUN chown arkana:arkana /home/arkana/.postgresql/root.crt && \
-    chmod 600 /home/arkana/.postgresql/root.crt \
-    
+RUN chmod 600 /home/arkana/.postgresql/root.crt
+
 COPY --from=builder --chown=arkana:arkana /app/arkana-api.jar app.jar
 
 USER arkana

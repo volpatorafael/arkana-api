@@ -62,8 +62,11 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Use explicit mapper code or dedicated mappers between HTTP DTOs, domain
   objects, and persistence entities.
 - Prefer Java records for immutable request/response and value DTOs.
-- Lombok is allowed, but do not use `@Data` on JPA entities. Avoid generated
-  `equals`, `hashCode`, and `toString` methods that traverse lazy relationships.
+- Use Lombok whenever it reduces boilerplate: `@RequiredArgsConstructor` for
+  dependency injection, `@Slf4j` for loggers, and `@Getter`/constructor
+  annotations for entities. Use `@Data` for simple mutable data carriers, but
+  not for JPA entities; avoid generated `equals`, `hashCode`, and `toString`
+  methods that traverse persistence relationships.
 - Prefer explicit local-variable types over Java type inference (`var`) when
   the declared type makes the code easier to read.
 - Follow the Java formatting: four-space indentation, one declaration or statement per

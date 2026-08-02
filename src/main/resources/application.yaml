@@ -35,8 +35,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+
+logging:
+  level:
+    root: error
+    com.arkana: info
+  pattern:
+    console: "%clr(%d{${LOG_DATEFORMAT_PATTERN:yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:%5p}) %clr(${PID: }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m %replace(requestId=%mdc{requestId} ){'requestId= ',''}%n${LOG_EXCEPTION_CONVERSION_WORD:%wEx}"
