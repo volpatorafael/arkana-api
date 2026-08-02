@@ -15,6 +15,12 @@ arkana:
     allowed-origins: ${ARKANA_ALLOWED_ORIGINS}
   app-url: ${ARKANA_APP_URL}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
 logging:
   level:
     root: info

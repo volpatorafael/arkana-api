@@ -1,0 +1,231 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-profiles
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: profiles
+      changes:
+        - createTable:
+            tableName: profiles
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(320)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_name
+                  type: varchar(120)
+              - column:
+                  name: status
+                  type: varchar(16)
+                  defaultValue: PENDING
+                  constraints:
+                    nullable: false
+              - column:
+                  name: locale
+                  type: varchar(8)
+                  defaultValue: pt-BR
+                  constraints:
+                    nullable: false
+              - column:
+                  name: approved_at
+                  type: timestamp with time zone
+              - column:
+                  name: approved_by
+                  type: uuid
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >-
+              alter table profiles add constraint profiles_status_check
+              check (status in ('PENDING', 'APPROVED', 'REJECTED', 'BLOCKED'))
+        - sql:
+            sql: >-
+              alter table profiles add constraint profiles_locale_check
+              check (locale in ('pt-BR', 'en'))
+  - changeSet:
+      id: 002-create-clients
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: clients
+      changes:
+        - createTable:
+            tableName: clients
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: owner_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: clients_owner_fkey
+                    references: profiles(id)
+              - column:
+                  name: name
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(320)
+              - column:
+                  name: phone
+                  type: varchar(40)
+              - column:
+                  name: notes
+                  type: varchar(10000)
+              - column:
+                  name: archived_at
+                  type: timestamp with time zone
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: clients
+            indexName: clients_owner_created_at_idx
+            columns:
+              - column:
+                  name: owner_id
+              - column:
+                  name: created_at
+              - column:
+                  name: id
+        - addUniqueConstraint:
+            tableName: clients
+            columnNames: id, owner_id
+            constraintName: clients_id_owner_unique
+  - changeSet:
+      id: 003-01-create-tarot-cards
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: tarot_cards
+      changes:
+        - createTable:
+            tableName: tarot_cards
+            columns:
+              - column:
+                  name: id
+                  type: varchar(80)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: card_number
+                  type: smallint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: suit
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column: { name: name_pt_br, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: name_en, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: description_pt_br, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: description_en, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: light_pt_br, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: light_en, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: shadow_pt_br, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: shadow_en, type: varchar(5000), constraints: { nullable: false } }
+  - changeSet:
+      id: 003-02-create-spreads
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: spreads
+      changes:
+        - createTable:
+            tableName: spreads
+            columns:
+              - column: { name: id, type: varchar(80), constraints: { primaryKey: true, nullable: false } }
+              - column: { name: display_order, type: smallint, constraints: { nullable: false, unique: true } }
+              - column: { name: name_pt_br, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: name_en, type: varchar(160), constraints: { nullable: false } }
+              - column: { name: short_description_pt_br, type: varchar(1000), constraints: { nullable: false } }
+              - column: { name: short_description_en, type: varchar(1000), constraints: { nullable: false } }
+              - column: { name: description_pt_br, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: description_en, type: varchar(5000), constraints: { nullable: false } }
+              - column: { name: use_case_pt_br, type: varchar(2000), constraints: { nullable: false } }
+              - column: { name: use_case_en, type: varchar(2000), constraints: { nullable: false } }
+              - column: { name: position_count, type: smallint, constraints: { nullable: false } }
+              - column: { name: active, type: boolean, defaultValueBoolean: true, constraints: { nullable: false } }
+  - changeSet:
+      id: 003-03-create-spread-positions
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: spread_positions
+      changes:
+        - createTable:
+            tableName: spread_positions
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: gen_random_uuid()
+                  constraints: { primaryKey: true, nullable: false }
+              - column:
+                  name: spread_id
+                  type: varchar(80)
+                  constraints: { nullable: false, foreignKeyName: spread_positions_spread_fkey, references: spreads(id) }
+              - column: { name: position_key, type: varchar(80), constraints: { nullable: false } }
+              - column: { name: position_order, type: smallint, constraints: { nullable: false } }
+              - column: { name: name_pt_br, type: varchar(200), constraints: { nullable: false } }
+              - column: { name: name_en, type: varchar(200), constraints: { nullable: false } }
+              - column: { name: meaning_pt_br, type: varchar(2000), constraints: { nullable: false } }
+              - column: { name: meaning_en, type: varchar(2000), constraints: { nullable: false } }
+              - column: { name: x, type: "decimal(5,2)", constraints: { nullable: false } }
+              - column: { name: y, type: "decimal(5,2)", constraints: { nullable: false } }
+              - column: { name: rotation, type: smallint, defaultValueNumeric: 0, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: spread_positions
+            columnNames: spread_id, position_key
+            constraintName: spread_positions_spread_key_unique
+        - addUniqueConstraint:
+            tableName: spread_positions
+            columnNames: spread_id, position_order
+            constraintName: spread_positions_spread_order_unique

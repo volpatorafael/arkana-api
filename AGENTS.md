@@ -134,6 +134,12 @@ provider and PostgreSQL host, not Arkana's domain API.
   domain schema changes.
 - Keep the root changelog at
   `src/main/resources/db/changelog/db.changelog-master.yaml`.
+- Name changelog files using `yyyyMMdd-xx-description.ext`, where `xx` is a
+  zero-padded sequence for that date, for example
+  `20260803-01-create-profiles.yaml`.
+- Changelogs may mix Liquibase XML, YAML, and formatted SQL when each format is
+  appropriate. Keep their execution order deterministic through the dated file
+  names included by the master changelog.
 - Prefer reviewed PostgreSQL SQL changesets included by the root YAML file,
   especially for constraints, indexes, grants, triggers, and functions.
 - Put application behavior in Java. Do not add database functions, procedures,

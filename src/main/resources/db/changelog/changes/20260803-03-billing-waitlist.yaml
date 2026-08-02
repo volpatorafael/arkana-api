@@ -1,0 +1,302 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-01-create-billing-plan-prices
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_plan_prices
+      changes:
+        - sql:
+            sql: >-
+              create table billing_plan_prices (
+                id uuid primary key,
+                code varchar(64) not null unique,
+                name varchar(120) not null,
+                billing_interval varchar(8) not null,
+                amount integer not null,
+                compare_at_amount integer,
+                currency varchar(3) not null default 'BRL',
+                trial_days integer not null default 14,
+                available_payment_methods varchar(80) not null,
+                active boolean not null default true,
+                is_default boolean not null default true,
+                created_at timestamp with time zone not null default current_timestamp
+              )
+
+  - changeSet:
+      id: 005-02-create-billing-accounts
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_accounts
+      changes:
+        - sql:
+            sql: >-
+              create table billing_accounts (
+                id uuid primary key,
+                owner_id uuid not null unique references profiles(id),
+                trial_email_fingerprint varchar(64) unique,
+                status varchar(32) not null default 'PENDING_PAYMENT',
+                trial_started_at timestamp with time zone,
+                trial_ends_at timestamp with time zone,
+                current_plan_price_id uuid references billing_plan_prices(id),
+                pending_plan_price_id uuid references billing_plan_prices(id),
+                current_period_start timestamp with time zone,
+                current_period_end timestamp with time zone,
+                cancel_at_period_end boolean not null default false,
+                override_ends_at timestamp with time zone,
+                created_at timestamp with time zone not null default current_timestamp,
+                updated_at timestamp with time zone not null default current_timestamp
+              )
+        - createIndex:
+            tableName: billing_accounts
+            indexName: billing_accounts_status_period_idx
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: current_period_end
+
+  - changeSet:
+      id: 005-03-create-billing-provider-plan-mappings
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_provider_plan_mappings
+      changes:
+        - sql:
+            sql: >-
+              create table billing_provider_plan_mappings (
+                id uuid primary key,
+                plan_price_id uuid not null references billing_plan_prices(id),
+                provider varchar(32) not null,
+                provider_product_id varchar(200) not null,
+                unique(plan_price_id, provider),
+                unique(provider, provider_product_id)
+              )
+
+  - changeSet:
+      id: 005-04-create-billing-provider-subscriptions
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_provider_subscriptions
+      changes:
+        - sql:
+            sql: >-
+              create table billing_provider_subscriptions (
+                id uuid primary key,
+                billing_account_id uuid not null references billing_accounts(id),
+                provider varchar(32) not null,
+                provider_subscription_id varchar(200) not null,
+                unique(billing_account_id, provider),
+                unique(provider, provider_subscription_id)
+              )
+
+  - changeSet:
+      id: 005-05-create-billing-promotion-campaigns
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_promotion_campaigns
+      changes:
+        - sql:
+            sql: >-
+              create table billing_promotion_campaigns (
+                id uuid primary key,
+                code varchar(64) not null unique,
+                name varchar(120) not null,
+                status varchar(16) not null,
+                starts_at timestamp with time zone not null,
+                ends_at timestamp with time zone not null,
+                retention_policy varchar(64) not null default 'WHILE_SUBSCRIPTION_ACTIVE',
+                created_at timestamp with time zone not null default current_timestamp
+              )
+
+  - changeSet:
+      id: 005-06-create-billing-promotion-campaign-prices
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_promotion_campaign_prices
+      changes:
+        - sql:
+            sql: >-
+              create table billing_promotion_campaign_prices (
+                campaign_id uuid not null references billing_promotion_campaigns(id),
+                billing_interval varchar(8) not null,
+                promotional_plan_price_id uuid not null references billing_plan_prices(id),
+                compare_at_plan_price_id uuid not null references billing_plan_prices(id),
+                primary key(campaign_id, billing_interval)
+              )
+
+  - changeSet:
+      id: 005-07-create-billing-promotion-eligibilities
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_promotion_eligibilities
+      changes:
+        - sql:
+            sql: >-
+              create table billing_promotion_eligibilities (
+                id uuid primary key,
+                billing_account_id uuid not null references billing_accounts(id),
+                campaign_id uuid not null references billing_promotion_campaigns(id),
+                status varchar(16) not null,
+                granted_at timestamp with time zone not null,
+                first_checkout_ends_at timestamp with time zone not null,
+                locked_at timestamp with time zone,
+                expired_at timestamp with time zone,
+                forfeited_at timestamp with time zone,
+                unique(billing_account_id, campaign_id)
+              )
+
+  - changeSet:
+      id: 005-08-create-billing-access-overrides
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_access_overrides
+      changes:
+        - sql:
+            sql: >-
+              create table billing_access_overrides (
+                id uuid primary key,
+                billing_account_id uuid not null references billing_accounts(id),
+                starts_at timestamp with time zone not null,
+                ends_at timestamp with time zone not null,
+                reason varchar(500) not null,
+                revoked_at timestamp with time zone,
+                created_at timestamp with time zone not null default current_timestamp
+              )
+
+  - changeSet:
+      id: 005-09-create-billing-checkouts
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_checkouts
+      changes:
+        - sql:
+            sql: >-
+              create table billing_checkouts (
+                id uuid primary key,
+                billing_account_id uuid not null references billing_accounts(id),
+                plan_price_id uuid not null references billing_plan_prices(id),
+                payment_method varchar(32) not null,
+                status varchar(16) not null,
+                idempotency_key uuid not null,
+                provider varchar(32) not null,
+                provider_checkout_id varchar(200),
+                checkout_url varchar(2000),
+                expires_at timestamp with time zone not null,
+                created_at timestamp with time zone not null default current_timestamp,
+                unique (billing_account_id, idempotency_key)
+              )
+
+  - changeSet:
+      id: 005-10-create-billing-provider-events
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: billing_provider_events
+      changes:
+        - sql:
+            sql: >-
+              create table billing_provider_events (
+                id uuid primary key,
+                provider varchar(32) not null,
+                provider_event_id varchar(200) not null,
+                event_type varchar(160) not null,
+                processing_status varchar(16) not null,
+                raw_payload varchar(100000) not null,
+                received_at timestamp with time zone not null default current_timestamp,
+                unique(provider, provider_event_id)
+              )
+
+  - changeSet:
+      id: 005-11-create-waitlist-entries
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: waitlist_entries
+      changes:
+        - sql:
+            sql: >-
+              create table waitlist_entries (
+                id uuid primary key,
+                email varchar(320) not null unique,
+                name varchar(120),
+                locale varchar(8) not null,
+                source varchar(80) not null,
+                consent_at timestamp with time zone not null,
+                created_at timestamp with time zone not null default current_timestamp
+              )
+
+  - changeSet:
+      id: 005-12-seed-monthly-plan
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: select count(*) from billing_plan_prices where code = 'ARKANA_MONTHLY'
+      changes:
+        - insert:
+            tableName: billing_plan_prices
+            columns:
+              - column: { name: id, value: 30000000-0000-0000-0000-000000000001 }
+              - column: { name: code, value: ARKANA_MONTHLY }
+              - column: { name: name, value: Arkana Mensal }
+              - column: { name: billing_interval, value: MONTH }
+              - column: { name: amount, valueNumeric: 4900 }
+              - column: { name: currency, value: BRL }
+              - column: { name: trial_days, valueNumeric: 14 }
+              - column: { name: available_payment_methods, value: "PIX_AUTOMATIC,CARD" }
+              - column: { name: active, valueBoolean: true }
+
+  - changeSet:
+      id: 005-13-seed-yearly-plan
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: select count(*) from billing_plan_prices where code = 'ARKANA_YEARLY'
+      changes:
+        - insert:
+            tableName: billing_plan_prices
+            columns:
+              - column: { name: id, value: 30000000-0000-0000-0000-000000000002 }
+              - column: { name: code, value: ARKANA_YEARLY }
+              - column: { name: name, value: Arkana Anual }
+              - column: { name: billing_interval, value: YEAR }
+              - column: { name: amount, valueNumeric: 49000 }
+              - column: { name: compare_at_amount, valueNumeric: 58800 }
+              - column: { name: currency, value: BRL }
+              - column: { name: trial_days, valueNumeric: 14 }
+              - column: { name: available_payment_methods, value: "PIX_AUTOMATIC,CARD" }
+              - column: { name: active, valueBoolean: true }

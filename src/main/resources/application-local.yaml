@@ -21,6 +21,12 @@ arkana:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   app-url: http://localhost:5173
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
 logging:
   level:
     root: info

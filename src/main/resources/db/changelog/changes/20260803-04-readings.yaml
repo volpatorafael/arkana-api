@@ -1,0 +1,102 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-01-create-readings
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: readings
+      changes:
+        - sql:
+            sql: >-
+              create table readings (
+                id uuid primary key,
+                owner_id uuid not null references profiles(id),
+                client_id uuid,
+                spread_id varchar(80) not null references spreads(id),
+                deck_mode varchar(8) not null,
+                status varchar(16) not null default 'IN_PROGRESS',
+                title varchar(200),
+                question varchar(5000),
+                context varchar(10000),
+                started_at timestamp with time zone not null,
+                completed_at timestamp with time zone,
+                archived_at timestamp with time zone,
+                created_at timestamp with time zone not null,
+                updated_at timestamp with time zone not null,
+                constraint readings_client_owner_fkey foreign key(client_id, owner_id) references clients(id, owner_id)
+              )
+        - createIndex:
+            tableName: readings
+            indexName: readings_owner_started_idx
+            columns:
+              - column:
+                  name: owner_id
+              - column:
+                  name: started_at
+              - column:
+                  name: id
+
+  - changeSet:
+      id: 006-02-create-reading-positions
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: reading_positions
+      changes:
+        - sql:
+            sql: >-
+              create table reading_positions (
+                id uuid primary key,
+                reading_id uuid not null references readings(id) on delete cascade,
+                spread_position_id uuid not null references spread_positions(id),
+                position_key varchar(80) not null,
+                position_order smallint not null,
+                name_pt_br varchar(200) not null,
+                name_en varchar(200) not null,
+                meaning_pt_br varchar(2000) not null,
+                meaning_en varchar(2000) not null,
+                x decimal(5,2) not null,
+                y decimal(5,2) not null,
+                rotation smallint not null,
+                card_id varchar(80) references tarot_cards(id),
+                orientation varchar(16),
+                interpretation varchar(10000),
+                created_at timestamp with time zone not null,
+                updated_at timestamp with time zone not null,
+                unique(reading_id, position_order),
+                unique(reading_id, card_id)
+              )
+
+  - changeSet:
+      id: 006-03-create-reading-comments
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: reading_comments
+      changes:
+        - sql:
+            sql: >-
+              create table reading_comments (
+                id uuid primary key,
+                owner_id uuid not null references profiles(id),
+                reading_id uuid not null references readings(id) on delete cascade,
+                body varchar(10000) not null,
+                created_at timestamp with time zone not null,
+                updated_at timestamp with time zone not null
+              )
+        - createIndex:
+            tableName: reading_comments
+            indexName: reading_comments_reading_created_idx
+            columns:
+              - column:
+                  name: reading_id
+              - column:
+                  name: created_at
+              - column:
+                  name: id
