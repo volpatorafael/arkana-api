@@ -6,6 +6,18 @@ not belong to this service.
 
 ## Local verification
 
+Start the local PostgreSQL using the same Compose layout as the x4fare
+backends:
+
+```bash
+docker compose up -d database
+```
+
+Then run the API with `SPRING_PROFILES_ACTIVE=local`. The local profile connects
+to `jdbc:postgresql://localhost:5432/arkana` using `arkana` as username and
+password. Liquibase applies every pending changeset automatically during
+application startup, following the same runtime flow as the x4fare backends.
+
 ```bash
 ./gradlew test
 ```
@@ -64,11 +76,10 @@ Supabase Auth configuration, set `OAUTH2_AUDIENCE=authenticated` in Coolify.
 
 Liquibase owns the domain schema through
 `src/main/resources/db/changelog/db.changelog-master.yaml`. Portable relational
-changes and deterministic catalog data run on H2 and PostgreSQL. Supabase Auth
-references, temporary Data API grants, and RLS live in separate
-PostgreSQL-only changesets.
+changes and deterministic catalog data run unchanged on H2 and PostgreSQL.
 Profile creation and every domain behavior remain in Java; the Arkana schema
-does not define custom functions, procedures, or triggers.
+does not depend on Supabase database schemas and does not define custom
+functions, procedures, or triggers.
 
 All automated backend verification belongs to the Java test suite and runs
 through Gradle. Do not depend on Node scripts from `arkana-supabase` or manual

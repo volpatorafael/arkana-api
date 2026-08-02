@@ -49,8 +49,12 @@ provider and PostgreSQL host, not Arkana's domain API.
 ## Package and code organization
 
 - The root Java package is `com.arkana`.
-- Prefer package-by-feature, for example `clients`, `readings`, `profiles`,
-  `catalog`, `billing`, and `waitlist`.
+- Keep controllers, services, and HTTP DTOs organized by feature, for example
+  `clients`, `readings`, `profiles`, `catalog`, `billing`, and `waitlist`.
+- Keep all JPA entities and persistent enums in `com.arkana.domain`, and all
+  Spring Data interfaces in `com.arkana.repository`.
+- Use JPA repositories for application persistence. Do not inject
+  `JdbcClient`, `JdbcTemplate`, or `NamedParameterJdbcTemplate` into services.
 - Within a feature, keep HTTP adapters, application use cases, domain logic,
   and persistence details separated when the distinction adds value. Do not
   create empty architectural layers preemptively.
@@ -60,6 +64,10 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Prefer Java records for immutable request/response and value DTOs.
 - Lombok is allowed, but do not use `@Data` on JPA entities. Avoid generated
   `equals`, `hashCode`, and `toString` methods that traverse lazy relationships.
+- Prefer explicit local-variable types over Java type inference (`var`) when
+  the declared type makes the code easier to read.
+- Follow the Java formatting: four-space indentation, one declaration or statement per
+  line, expanded control-flow blocks, explicit imports, and readable wrapping.
 
 ## Authentication and authorization
 
@@ -90,13 +98,13 @@ provider and PostgreSQL host, not Arkana's domain API.
 - PostgreSQL is the persistence technology. Keep application code portable so
   the database can move away from Supabase hosting without redesigning the
   domain or HTTP API.
-- Connect with a dedicated least-privilege application login role. Never use
-  `postgres`, `service_role`, a secret API key, or a role with `BYPASSRLS` for
-  ordinary application traffic.
-- Use separate credentials for schema migration and runtime access. The
-  Liquibase role may perform required DDL; the application role receives only
-  the necessary DML privileges.
-- Configure Hibernate schema handling as `ddl-auto: validate`. Never use
+- Use the datasource credentials configured through the `ARKANA_DATABASE_*`
+  environment variables. Liquibase and the application share that datasource
+  unless a concrete operational requirement justifies additional database
+  users.
+- Never use a Supabase `service_role` key or another HTTP API secret as a JDBC
+  credential.
+- Configure Hibernate schema handling as `ddl-auto: none`. Never use
   `create`, `create-drop`, or `update` outside an explicitly isolated test.
 - Disable Open Session in View. Load the data required by a use case inside its
   transaction instead of relying on lazy loading from controllers.
@@ -107,22 +115,15 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Prefer UUID identifiers and timezone-aware timestamps consistently with the
   existing schema and OpenAPI contract.
 
-## RLS and the Data API
+## Database authorization
 
-- Treat RLS as defense in depth, even though all normal domain access crosses
-  this service.
-- A JDBC connection does not automatically receive the PostgREST request JWT
-  context used by `auth.uid()`. Do not assume existing caller-scoped Supabase
-  policies protect queries made by Spring.
-- Any design that propagates caller identity into a PostgreSQL session must use
-  transaction-local state, work correctly with pooled connections, be covered
-  by integration tests, and receive an explicit security review.
-- Every application query and mutation must independently constrain ownership;
-  RLS is not a substitute for application authorization.
-- Do not grant domain-table access to `anon` or `authenticated` merely to make
-  Spring persistence work. Use the dedicated application role.
-- When the Edge Function cutover is complete, revoke obsolete Data API grants
-  and stop exposing Arkana domain tables through the Data API.
+- Every application query and mutation must constrain ownership using the
+  verified JWT subject. Database access never replaces application-level
+  authorization.
+- The web client must not receive credentials or grants for domain-table
+  access. It calls only the versioned Arkana HTTP API.
+- After the Edge Function cutover, revoke obsolete Data API grants and stop
+  exposing Arkana domain tables through the Data API.
 
 ## Liquibase ownership
 
@@ -131,8 +132,10 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Keep the root changelog at
   `src/main/resources/db/changelog/db.changelog-master.yaml`.
 - Prefer reviewed PostgreSQL SQL changesets included by the root YAML file,
-  especially for constraints, indexes, grants, policies, triggers, and
-  functions.
+  especially for constraints, indexes, grants, triggers, and functions.
+- Put application behavior in Java. Do not add database functions, procedures,
+  or triggers unless a transaction and declarative constraints cannot implement
+  the requirement safely and the exception has been explicitly reviewed.
 - Never edit a changeset that may already have run. Add a new forward-only
   changeset.
 - Never use Hibernate schema generation as a migration mechanism.
@@ -192,8 +195,11 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Add authorization tests proving one user cannot read or mutate another
   user's resources and that pending, rejected, or blocked profiles cannot use
   approved-only operations.
-- Test persistence and Liquibase behavior against PostgreSQL. Do not rely on H2
-  for PostgreSQL SQL, constraints, RLS, functions, or migration tests.
+- Run Spring/JPA integration tests with H2 in PostgreSQL compatibility mode,
+  with Liquibase enabled and Hibernate schema generation disabled. Any separate
+  PostgreSQL-specific integration suite must be implemented in Java with JUnit
+  and invoked through Gradle. Do not use Node, shell, or manual `psql` scripts
+  as part of the backend verification workflow.
 - Verify new migrations both on an empty database and as an upgrade from the
   previous application version.
 - Run at minimum `./gradlew test` before handing off code. Run any contract and
