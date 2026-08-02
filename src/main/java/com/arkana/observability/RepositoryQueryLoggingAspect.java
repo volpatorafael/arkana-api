@@ -3,8 +3,6 @@ package com.arkana.observability;
 import static com.arkana.observability.ArkanaMetric.REPOSITORY_QUERY_COUNT;
 import static com.arkana.observability.ArkanaMetric.REPOSITORY_QUERY_DURATION;
 
-import com.arkana.domain.ProfileEntity;
-
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
