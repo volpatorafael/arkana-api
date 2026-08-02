@@ -1,0 +1,35 @@
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:h2:mem:arkana;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    hikari:
+      auto-commit: false
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://arkana.test/auth/v1
+          jwk-set-uri: https://arkana.test/auth/v1/.well-known/jwks.json
+          audiences: authenticated
+
+arkana:
+  cors:
+    allowed-origins: http://localhost:5173
+  abacatepay:
+    webhook-secret: test-webhook-secret
+    webhook-hmac-key: test-hmac-key
+  reconciliation-secret: test-reconciliation-secret
+
+logging:
+  level:
+    root: warn

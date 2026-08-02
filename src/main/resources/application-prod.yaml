@@ -1,0 +1,26 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${ARKANA_DATABASE_URL}
+    username: ${ARKANA_DATABASE_USERNAME}
+    password: ${ARKANA_DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100
+
+arkana:
+  cors:
+    allowed-origins: ${ARKANA_ALLOWED_ORIGINS}
+  app-url: ${ARKANA_APP_URL}
+
+logging:
+  level:
+    root: info
+    com.arkana: info

@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: qa
+  datasource:
+    url: ${ARKANA_DATABASE_URL}
+    username: ${ARKANA_DATABASE_USERNAME}
+    password: ${ARKANA_DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+
+arkana:
+  cors:
+    allowed-origins: ${ARKANA_ALLOWED_ORIGINS}
+  app-url: ${ARKANA_APP_URL}
+
+logging:
+  level:
+    root: info
+    com.arkana: info
+    org.springframework.web.cors: info
