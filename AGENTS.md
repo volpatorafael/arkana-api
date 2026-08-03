@@ -53,6 +53,8 @@ provider and PostgreSQL host, not Arkana's domain API.
   `clients`, `readings`, `profiles`, `catalog`, `billing`, and `waitlist`.
 - Keep all JPA entities and persistent enums in `com.arkana.domain`, and all
   Spring Data interfaces in `com.arkana.repository`.
+- Name JPA entities after the domain concept without an `Entity` suffix, for
+  example `Client`, `Reading`, and `BillingAccount`.
 - Use JPA repositories for application persistence. Do not inject
   `JdbcClient`, `JdbcTemplate`, or `NamedParameterJdbcTemplate` into services.
 - Within a feature, keep HTTP adapters, application use cases, domain logic,

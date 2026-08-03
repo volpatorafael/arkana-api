@@ -19,7 +19,7 @@ databaseChangeLog:
                 compare_at_amount integer,
                 currency varchar(3) not null default 'BRL',
                 trial_days integer not null default 14,
-                available_payment_methods varchar(80) not null,
+                available_payment_methods text array not null,
                 active boolean not null default true,
                 is_default boolean not null default true,
                 created_at timestamp with time zone not null default current_timestamp
@@ -275,7 +275,9 @@ databaseChangeLog:
               - column: { name: amount, valueNumeric: 4900 }
               - column: { name: currency, value: BRL }
               - column: { name: trial_days, valueNumeric: 14 }
-              - column: { name: available_payment_methods, value: "PIX_AUTOMATIC,CARD" }
+              - column:
+                  name: available_payment_methods
+                  valueComputed: "ARRAY['PIX_AUTOMATIC', 'CARD']"
               - column: { name: active, valueBoolean: true }
 
   - changeSet:
@@ -298,5 +300,7 @@ databaseChangeLog:
               - column: { name: compare_at_amount, valueNumeric: 58800 }
               - column: { name: currency, value: BRL }
               - column: { name: trial_days, valueNumeric: 14 }
-              - column: { name: available_payment_methods, value: "PIX_AUTOMATIC,CARD" }
+              - column:
+                  name: available_payment_methods
+                  valueComputed: "ARRAY['PIX_AUTOMATIC', 'CARD']"
               - column: { name: active, valueBoolean: true }
