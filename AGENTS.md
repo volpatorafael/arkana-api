@@ -37,8 +37,8 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Change the contract before, or in the same change set as, any externally
   observable API behavior.
 - Implement every product route under `/v1`.
-- Keep JSON DTOs camelCase and use the application-owned error codes defined by
-  the contract.
+- Keep JSON DTOs camelCase. Return errors as unextended RFC 9457 Problem
+  Details using `application/problem+json`.
 - Never expose JPA entities, database rows, table names, PostgreSQL errors,
   Hibernate details, or Supabase response envelopes through HTTP.
 - Never accept `ownerId`, `userId`, or equivalent ownership fields from a
@@ -92,8 +92,9 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Never authorize from Supabase `user_metadata`. Authorization data belongs in
   protected Arkana tables or trusted `app_metadata`, with JWT staleness
   considered when claims are used.
-- Return the contract's stable `401` and `403` error representations rather
-  than Spring Security's default HTML or implementation-specific bodies.
+- Return the contract's RFC 9457 `ProblemDetail` representation for `401` and
+  `403` rather than Spring Security's default HTML or implementation-specific
+  bodies.
 - Keep CORS origins configuration-driven and narrowly scoped per environment.
 
 ## Database access
@@ -181,8 +182,10 @@ provider and PostgreSQL host, not Arkana's domain API.
 
 - Validate request syntax at the HTTP boundary and enforce business invariants
   in application/domain code.
-- Centralize exception-to-`ApiError` mapping. Do not return stack traces,
-  internal messages, SQL details, or secrets.
+- Use Spring's native `ProblemDetail`, `ErrorResponse`, and
+  `ErrorResponseException` support for RFC 9457 errors. Do not add a custom
+  error envelope or non-standard fields. Centralize safe exception translation
+  and never return stack traces, internal messages, SQL details, or secrets.
 - Include a request/correlation identifier in logs and error responses when the
   contract provides for one.
 - Use structured, privacy-conscious logging. Never log bearer tokens, cookies,
