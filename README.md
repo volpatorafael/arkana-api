@@ -4,6 +4,37 @@ Spring Boot implementation of the versioned Arkana domain API. Supabase remains
 the identity provider and temporary PostgreSQL host; login and token refresh do
 not belong to this service.
 
+## Code organization
+
+The Java source follows the layer-based organization used by the x4 backends:
+
+```text
+com.arkana
+├── controller        HTTP controllers
+├── service           application services and authorizers
+├── dto               HTTP request and response records by business area
+│   ├── billing
+│   ├── catalog
+│   ├── client
+│   ├── profile
+│   ├── reading
+│   └── waitlist
+├── domain            JPA entities and persistent enums
+├── repository        Spring Data repositories
+├── integration       external-service ports
+│   ├── abacatepay    AbacatePay adapter
+│   └── resend        Resend adapter
+├── exception         RFC 9457 exception translation
+├── config
+├── security
+└── observability
+```
+
+Packages are organized by technical layer, not by endpoint. JPA entities use
+the domain name directly, without an `Entity` suffix. HTTP DTOs use explicit
+`Request` and `Response` suffixes where needed to avoid colliding with domain
+types.
+
 ## Local verification
 
 Start the local PostgreSQL using the same Compose layout as the x4fare
@@ -80,6 +111,11 @@ changes and deterministic catalog data run unchanged on H2 and PostgreSQL.
 Profile creation and every domain behavior remain in Java; the Arkana schema
 does not depend on Supabase database schemas and does not define custom
 functions, procedures, or triggers.
+
+PostgreSQL array columns are represented as arrays in Liquibase and as typed
+Java collections in JPA. In particular, `available_payment_methods` is a
+`text[]`/`text array` column mapped to `List<String>`; seeds use the portable
+SQL array constructor rather than CSV strings.
 
 All automated backend verification belongs to the Java test suite and runs
 through Gradle. Do not depend on Node scripts from `arkana-supabase` or manual

@@ -49,17 +49,24 @@ provider and PostgreSQL host, not Arkana's domain API.
 ## Package and code organization
 
 - The root Java package is `com.arkana`.
-- Keep controllers, services, and HTTP DTOs organized by feature, for example
-  `clients`, `readings`, `profiles`, `catalog`, `billing`, and `waitlist`.
+- Organize application code by technical layer, following the x4 backend
+  convention. Do not create a root package per endpoint or feature.
+- Keep HTTP controllers in `com.arkana.controller`.
+- Keep application services and authorizers in `com.arkana.service`.
+- Keep HTTP request and response records in `com.arkana.dto`, grouped into
+  business-area subpackages such as `dto.billing`, `dto.catalog`,
+  `dto.client`, `dto.profile`, `dto.reading`, and `dto.waitlist`.
 - Keep all JPA entities and persistent enums in `com.arkana.domain`, and all
   Spring Data interfaces in `com.arkana.repository`.
 - Name JPA entities after the domain concept without an `Entity` suffix, for
   example `Client`, `Reading`, and `BillingAccount`.
+- Keep integration ports in `com.arkana.integration` and provider adapters in
+  provider-specific subpackages such as `integration.abacatepay` and
+  `integration.resend`.
+- Keep cross-cutting configuration, security, exception translation, and
+  observability in `config`, `security`, `exception`, and `observability`.
 - Use JPA repositories for application persistence. Do not inject
   `JdbcClient`, `JdbcTemplate`, or `NamedParameterJdbcTemplate` into services.
-- Within a feature, keep HTTP adapters, application use cases, domain logic,
-  and persistence details separated when the distinction adds value. Do not
-  create empty architectural layers preemptively.
 - Keep domain decisions out of controllers and repository implementations.
 - Use explicit mapper code or dedicated mappers between HTTP DTOs, domain
   objects, and persistence entities.

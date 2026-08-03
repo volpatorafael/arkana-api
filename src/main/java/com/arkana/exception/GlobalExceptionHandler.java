@@ -1,4 +1,4 @@
-package com.arkana.shared.api;
+package com.arkana.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;

@@ -19,7 +19,7 @@ databaseChangeLog:
                 compare_at_amount integer,
                 currency varchar(3) not null default 'BRL',
                 trial_days integer not null default 14,
-                available_payment_methods text array not null,
+                available_payment_methods varchar(80) not null,
                 active boolean not null default true,
                 is_default boolean not null default true,
                 created_at timestamp with time zone not null default current_timestamp
@@ -255,6 +255,74 @@ databaseChangeLog:
                 consent_at timestamp with time zone not null,
                 created_at timestamp with time zone not null default current_timestamp
               )
+
+  - changeSet:
+      id: 005-11-00-01-convert-billing-plan-methods-postgresql
+      author: arkana
+      dbms: postgresql
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: character varying
+            sql: >-
+              select data_type
+              from information_schema.columns
+              where table_schema = 'public'
+                and table_name = 'billing_plan_prices'
+                and column_name = 'available_payment_methods'
+      changes:
+        - sql:
+            sql: >-
+              alter table billing_plan_prices
+              alter column available_payment_methods type text[]
+              using string_to_array(available_payment_methods, ',')
+
+  - changeSet:
+      id: 005-11-00-02-convert-billing-plan-methods-h2
+      author: arkana
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              alter table billing_plan_prices
+              alter column available_payment_methods text array
+
+  - changeSet:
+      id: 005-11-01-add-billing-plan-compare-at-amount
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: billing_plan_prices
+                columnName: compare_at_amount
+      changes:
+        - addColumn:
+            tableName: billing_plan_prices
+            columns:
+              - column:
+                  name: compare_at_amount
+                  type: integer
+
+  - changeSet:
+      id: 005-11-02-add-billing-plan-default-flag
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: billing_plan_prices
+                columnName: is_default
+      changes:
+        - addColumn:
+            tableName: billing_plan_prices
+            columns:
+              - column:
+                  name: is_default
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
 
   - changeSet:
       id: 005-12-seed-monthly-plan

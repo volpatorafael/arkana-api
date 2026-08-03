@@ -1,4 +1,4 @@
-package com.arkana.shared.web;
+package com.arkana.observability;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
