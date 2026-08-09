@@ -59,6 +59,12 @@ concerns the current Auth/JWKS integration or Supabase hosting infrastructure.
 - Keep HTTP request and response records in `com.arkana.dto`, grouped into
   business-area subpackages such as `dto.billing`, `dto.catalog`,
   `dto.client`, `dto.profile`, `dto.reading`, and `dto.waitlist`.
+- Keep all conversions between domain objects and HTTP DTOs in dedicated
+  mappers under `com.arkana.mapper`. Controllers and services must not
+  construct response DTOs or response maps directly.
+- Create one reusable mapper per principal domain entity. Aggregate mappers
+  must compose the entity mappers instead of duplicating mappings for nested
+  entities.
 - Keep all JPA entities and persistent enums in `com.arkana.domain`, and all
   Spring Data interfaces in `com.arkana.repository`.
 - Name JPA entities after the domain concept without an `Entity` suffix, for
@@ -71,8 +77,17 @@ concerns the current Auth/JWKS integration or Supabase hosting infrastructure.
 - Use JPA repositories for application persistence. Do not inject
   `JdbcClient`, `JdbcTemplate`, or `NamedParameterJdbcTemplate` into services.
 - Keep domain decisions out of controllers and repository implementations.
-- Use explicit mapper code or dedicated mappers between HTTP DTOs, domain
-  objects, and persistence entities.
+- Use MapStruct for direct mappings between HTTP DTOs, domain objects, and
+  persistence entities. Locale-aware or aggregate mappings may use explicit
+  default methods, but that presentation logic must remain inside the
+  dedicated mapper.
+- Declare every field mapping that MapStruct can generate with `@Mapping`.
+  Do not manually invoke response DTO constructors inside mappers. Default
+  methods may calculate individual derived or localized values, which are then
+  consumed by a generated mapping method.
+- Compose MapStruct mappers through `@Mapper(uses = ...)`, using constructor
+  injection for generated dependencies. Do not inject mapper dependencies with
+  `@Autowired` fields in mapper source code.
 - Prefer Java records for immutable request/response and value DTOs.
 - Use Lombok whenever it reduces boilerplate: `@RequiredArgsConstructor` for
   dependency injection, `@Slf4j` for loggers, and `@Getter`/constructor

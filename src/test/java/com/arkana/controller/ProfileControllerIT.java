@@ -26,6 +26,10 @@ class ProfileControllerIT extends BaseControllerIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(firstUser.getId().toString()))
             .andExpect(jsonPath("$.email").value(firstUser.getEmail()))
+            .andExpect(jsonPath("$.displayName").isEmpty())
+            .andExpect(jsonPath("$.locale").value(firstUser.getLocale()))
+            .andExpect(jsonPath("$.createdAt").isNotEmpty())
+            .andExpect(jsonPath("$.updatedAt").isNotEmpty())
             .andExpect(jsonPath("$.id").value(org.hamcrest.Matchers.not(secondUser.getId().toString())));
     }
 

@@ -70,7 +70,21 @@ class BillingControllerIT extends BaseControllerIT {
         mockMvcPerform(post("/v1/billing/trial").with(authenticatedAs(firstUser)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("TRIALING"))
-            .andExpect(jsonPath("$.accessStatus").value("ACTIVE"));
+            .andExpect(jsonPath("$.accessStatus").value("ACTIVE"))
+            .andExpect(jsonPath("$.trialStartedAt").isNotEmpty())
+            .andExpect(jsonPath("$.trialEndsAt").isNotEmpty())
+            .andExpect(jsonPath("$.currentPeriodStart").isEmpty())
+            .andExpect(jsonPath("$.currentPeriodEnd").isEmpty())
+            .andExpect(jsonPath("$.cancelAtPeriodEnd").value(false))
+            .andExpect(jsonPath("$.currentPlan").isEmpty())
+            .andExpect(jsonPath("$.pendingPlan").isEmpty())
+            .andExpect(jsonPath("$.overrideEndsAt").isEmpty())
+            .andExpect(jsonPath("$.availablePaymentMethods[0]").value("PIX_AUTOMATIC"))
+            .andExpect(jsonPath("$.availablePaymentMethods[1]").value("CARD"))
+            .andExpect(jsonPath("$.canCheckout").value(false))
+            .andExpect(jsonPath("$.canCancel").value(false))
+            .andExpect(jsonPath("$.canChangePlan").value(false))
+            .andExpect(jsonPath("$.promotion").isEmpty());
 
         BillingAccount firstAccount = accountRepository.findByOwnerId(firstUser.getId()).orElseThrow();
         BillingAccount unchangedSecond = accountRepository.findByOwnerId(secondUser.getId()).orElseThrow();
@@ -124,7 +138,21 @@ class BillingControllerIT extends BaseControllerIT {
 
         mockMvcPerform(get("/v1/billing/plans").with(authenticatedAs(secondUser)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[*].code", hasItem(promotionalCode)));
+            .andExpect(jsonPath("$[*].code", hasItem(promotionalCode)))
+            .andExpect(jsonPath("$[0].promotion.code").value(campaign.getCode()))
+            .andExpect(jsonPath("$[0].promotion.name").value(campaign.getName()))
+            .andExpect(jsonPath("$[0].promotion.campaignEndsAt").isNotEmpty())
+            .andExpect(jsonPath("$[0].promotion.offerEndsAt").isNotEmpty())
+            .andExpect(jsonPath("$[0].promotion.retentionPolicy").value("WHILE_SUBSCRIPTION_ACTIVE"));
+
+        mockMvcPerform(get("/v1/billing/subscription").with(authenticatedAs(secondUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.promotion.code").value(campaign.getCode()))
+            .andExpect(jsonPath("$.promotion.name").value(campaign.getName()))
+            .andExpect(jsonPath("$.promotion.status").value("ELIGIBLE"))
+            .andExpect(jsonPath("$.promotion.campaignEndsAt").isNotEmpty())
+            .andExpect(jsonPath("$.promotion.firstCheckoutEndsAt").isNotEmpty())
+            .andExpect(jsonPath("$.promotion.lockedAt").isEmpty());
 
         assertThat(accountRepository.findById(firstAccount.getId())).isPresent();
     }
@@ -143,6 +171,11 @@ class BillingControllerIT extends BaseControllerIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ACTIVE"))
             .andExpect(jsonPath("$.currentPlan.id").value(MONTHLY_PLAN_ID.toString()))
+            .andExpect(jsonPath("$.currentPlan.code").value("ARKANA_MONTHLY"))
+            .andExpect(jsonPath("$.currentPlan.name").value("Arkana Mensal"))
+            .andExpect(jsonPath("$.currentPlan.interval").value("MONTH"))
+            .andExpect(jsonPath("$.currentPlan.amount").value(4900))
+            .andExpect(jsonPath("$.currentPlan.currency").value("BRL"))
             .andExpect(jsonPath("$.currentPlan.id").value(not(YEARLY_PLAN_ID.toString())));
     }
 
@@ -171,7 +204,8 @@ class BillingControllerIT extends BaseControllerIT {
                 .content("{\"planPriceId\":\"" + MONTHLY_PLAN_ID + "\",\"paymentMethod\":\"CARD\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(not(secondCheckout.getId().toString())))
-            .andExpect(jsonPath("$.url").value("https://checkout.test/first"));
+            .andExpect(jsonPath("$.url").value("https://checkout.test/first"))
+            .andExpect(jsonPath("$.expiresAt").isNotEmpty());
 
         BillingCheckout firstCheckout = checkoutRepository
             .findByBillingAccountIdAndIdempotencyKey(firstAccount.getId(), sharedKey)

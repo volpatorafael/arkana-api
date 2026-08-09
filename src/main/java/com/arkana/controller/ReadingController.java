@@ -1,6 +1,10 @@
 package com.arkana.controller;
 
 import com.arkana.dto.reading.CreateReadingRequest;
+import com.arkana.dto.reading.ReadingCommentResponse;
+import com.arkana.dto.reading.ReadingPageResponse;
+import com.arkana.dto.reading.ReadingPositionResponse;
+import com.arkana.dto.reading.ReadingResponse;
 import com.arkana.dto.reading.SaveReadingCommentRequest;
 import com.arkana.dto.reading.SaveReadingPositionRequest;
 import com.arkana.dto.reading.UpdateReadingRequest;
@@ -25,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -36,7 +39,7 @@ public class ReadingController {
   private final CurrentUser currentUser;
 
   @GetMapping
-  Map<String, Object> list(
+  ReadingPageResponse list(
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "25") int pageSize,
@@ -51,7 +54,7 @@ public class ReadingController {
   }
 
   @PostMapping
-  ResponseEntity<Map<String, Object>> create(
+  ResponseEntity<ReadingResponse> create(
       @AuthenticationPrincipal Jwt jwt,
       @Valid @RequestBody CreateReadingRequest body,
       @RequestParam(required = false) String locale) {
@@ -59,7 +62,7 @@ public class ReadingController {
   }
 
   @GetMapping("/{id}")
-  Map<String, Object> get(
+  ReadingResponse get(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @RequestParam(required = false) String locale) {
@@ -67,7 +70,7 @@ public class ReadingController {
   }
 
   @PatchMapping("/{id}")
-  Map<String, Object> update(
+  ReadingResponse update(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @Valid @RequestBody UpdateReadingRequest body,
@@ -82,7 +85,7 @@ public class ReadingController {
   }
 
   @PutMapping("/{id}/positions/{positionId}")
-  Map<String, Object> position(
+  ReadingPositionResponse position(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @PathVariable UUID positionId,
@@ -92,7 +95,7 @@ public class ReadingController {
   }
 
   @PostMapping("/{id}/complete")
-  Map<String, Object> complete(
+  ReadingResponse complete(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @RequestParam(required = false) String locale) {
@@ -100,7 +103,7 @@ public class ReadingController {
   }
 
   @PostMapping("/{id}/archive")
-  Map<String, Object> archive(
+  ReadingResponse archive(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @RequestParam(required = false) String locale) {
@@ -108,7 +111,7 @@ public class ReadingController {
   }
 
   @PostMapping("/{id}/restore")
-  Map<String, Object> restore(
+  ReadingResponse restore(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @RequestParam(required = false) String locale) {
@@ -116,12 +119,14 @@ public class ReadingController {
   }
 
   @GetMapping("/{id}/comments")
-  List<Map<String, Object>> comments(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+  List<ReadingCommentResponse> comments(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable UUID id) {
     return readings.comments(currentUser.id(jwt), id);
   }
 
   @PostMapping("/{id}/comments")
-  ResponseEntity<Map<String, Object>> addComment(
+  ResponseEntity<ReadingCommentResponse> addComment(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @Valid @RequestBody SaveReadingCommentRequest body) {
@@ -129,7 +134,7 @@ public class ReadingController {
   }
 
   @PatchMapping("/{id}/comments/{commentId}")
-  Map<String, Object> updateComment(
+  ReadingCommentResponse updateComment(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable UUID id,
       @PathVariable UUID commentId,

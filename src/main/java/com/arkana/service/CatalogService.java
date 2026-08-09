@@ -3,9 +3,11 @@ package com.arkana.service;
 import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
-import com.arkana.dto.catalog.SpreadPositionResponse;
 import com.arkana.dto.catalog.SpreadResponse;
 import com.arkana.dto.catalog.TarotCardResponse;
+import com.arkana.mapper.SpreadMapper;
+import com.arkana.mapper.SpreadPositionMapper;
+import com.arkana.mapper.TarotCardMapper;
 import com.arkana.repository.SpreadRepository;
 import com.arkana.repository.TarotCardRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,9 @@ public class CatalogService {
   private final ProductAccessAuthorizer access;
   private final TarotCardRepository cards;
   private final SpreadRepository spreads;
+  private final TarotCardMapper cardMapper;
+  private final SpreadMapper spreadMapper;
+  private final SpreadPositionMapper spreadPositionMapper;
 
   @Transactional(readOnly = true)
   public List<TarotCardResponse> cards(UUID userId, String deckMode, String locale) {
@@ -39,7 +44,7 @@ public class CatalogService {
     List<TarotCard> rows = normalizedMode == ReadingDeckMode.MAJOR
         ? cards.findAllBySuitOrderByCardNumberAsc("major")
         : cards.findAllByOrderBySuitAscCardNumberAsc();
-    return rows.stream().map(card -> card(card, normalizedLocale)).toList();
+    return rows.stream().map(card -> cardMapper.toResponse(card, normalizedLocale)).toList();
   }
 
   @Transactional(readOnly = true)
@@ -47,7 +52,13 @@ public class CatalogService {
     access.requireAccess(userId);
     String normalizedLocale = locale(locale);
     return spreads.findAllByActiveTrueOrderByDisplayOrderAsc().stream()
-        .map(spread -> spread(spread, normalizedLocale)).toList();
+        .map(spread -> spreadMapper.toResponse(
+            spread,
+            spread.getPositions().stream()
+                .map(position -> spreadPositionMapper.toResponse(position, normalizedLocale))
+                .toList(),
+            normalizedLocale))
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -55,7 +66,13 @@ public class CatalogService {
     access.requireAccess(userId);
     Spread row = spreads.findByIdAndActiveTrue(spreadId).orElseThrow(() ->
         new ResponseStatusException(HttpStatus.NOT_FOUND, "Spread not found."));
-    return spread(row, locale(locale));
+    String normalizedLocale = locale(locale);
+    return spreadMapper.toResponse(
+        row,
+        row.getPositions().stream()
+            .map(position -> spreadPositionMapper.toResponse(position, normalizedLocale))
+            .toList(),
+        normalizedLocale);
   }
 
   private String locale(String locale) {
@@ -66,32 +83,4 @@ public class CatalogService {
     return value;
   }
 
-  private TarotCardResponse card(TarotCard card, String locale) {
-    boolean ptBr = locale.equals("pt-BR");
-    return new TarotCardResponse(card.getId(), card.getCardNumber(), card.getSuit(),
-        ptBr ? card.getNamePtBr() : card.getNameEn(),
-        ptBr ? card.getDescriptionPtBr() : card.getDescriptionEn(),
-        ptBr ? card.getLightPtBr() : card.getLightEn(),
-        ptBr ? card.getShadowPtBr() : card.getShadowEn());
-  }
-
-  private SpreadResponse spread(Spread spread, String locale) {
-    boolean ptBr = locale.equals("pt-BR");
-    List<SpreadPositionResponse> positions = spread.getPositions().stream()
-        .map(position -> new SpreadPositionResponse(
-            position.getId(),
-            position.getPositionKey(),
-            position.getPositionOrder(),
-            ptBr ? position.getNamePtBr() : position.getNameEn(),
-            ptBr ? position.getMeaningPtBr() : position.getMeaningEn(),
-            position.getX(),
-            position.getY(),
-            position.getRotation()))
-        .toList();
-    return new SpreadResponse(spread.getId(), ptBr ? spread.getNamePtBr() : spread.getNameEn(),
-        ptBr ? spread.getShortDescriptionPtBr() : spread.getShortDescriptionEn(),
-        ptBr ? spread.getDescriptionPtBr() : spread.getDescriptionEn(),
-        ptBr ? spread.getUseCasePtBr() : spread.getUseCaseEn(),
-        spread.getPositionCount(), spread.isActive(), positions);
-  }
 }

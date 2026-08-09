@@ -18,10 +18,17 @@ import com.arkana.domain.Profile;
 import com.arkana.dto.billing.BillingCheckoutResponse;
 import com.arkana.dto.billing.BillingOverview;
 import com.arkana.dto.billing.BillingPlanSummary;
+import com.arkana.dto.billing.BillingPromotionResponse;
 import com.arkana.dto.billing.ChangeBillingPlanRequest;
 import com.arkana.dto.billing.CreateBillingCheckoutRequest;
 import com.arkana.dto.billing.SubscriptionPlanResponse;
+import com.arkana.dto.billing.PlanPromotionResponse;
 import com.arkana.integration.PaymentProvider;
+import com.arkana.mapper.BillingAccountMapper;
+import com.arkana.mapper.BillingCheckoutMapper;
+import com.arkana.mapper.BillingPlanPriceMapper;
+import com.arkana.mapper.BillingPromotionMapper;
+import com.arkana.mapper.BillingOverviewMappingSource;
 import com.arkana.repository.BillingAccessOverrideRepository;
 import com.arkana.repository.BillingAccountRepository;
 import com.arkana.repository.BillingCheckoutRepository;
@@ -48,7 +55,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -74,6 +80,10 @@ public class BillingService {
   private final BillingProviderEventRepository providerEvents;
   private final ProfileRepository profiles;
   private final PaymentProvider provider;
+  private final BillingAccountMapper accountMapper;
+  private final BillingCheckoutMapper checkoutMapper;
+  private final BillingPlanPriceMapper planMapper;
+  private final BillingPromotionMapper promotionMapper;
 
   private static OffsetDateTime now() {
     return OffsetDateTime.now(ZoneOffset.UTC);
@@ -144,14 +154,10 @@ public class BillingService {
         ? BillingAccountStatus.EXPIRED
         : value.getStatus();
     OffsetDateTime overrideEnd = activeOverride(value, currentTime);
-    return new BillingOverview(
+    return accountMapper.toOverview(
+        value,
         effectiveStatus.name(),
         accessStatus(value, overrideEnd, currentTime),
-        value.getTrialStartedAt(),
-        value.getTrialEndsAt(),
-        value.getCurrentPeriodStart(),
-        value.getCurrentPeriodEnd(),
-        value.isCancelAtPeriodEnd(),
         plan(value.getCurrentPlanPriceId()),
         plan(value.getPendingPlanPriceId()),
         overrideEnd,
@@ -218,7 +224,10 @@ public class BillingService {
           providerCheckout.url(),
           providerCheckout.expiresAt());
       checkouts.flush();
-      return new BillingCheckoutResponse(checkoutId, providerCheckout.url(), providerCheckout.expiresAt());
+      return checkoutMapper.toResponse(
+          checkoutId,
+          providerCheckout.url(),
+          providerCheckout.expiresAt());
     } catch (RuntimeException exception) {
       checkout.fail();
       checkouts.flush();
@@ -318,7 +327,7 @@ public class BillingService {
           "Idempotency-Key was reused with different parameters.");
     }
     if (existing.getCheckoutUrl() != null) {
-      return new BillingCheckoutResponse(existing.getId(), existing.getCheckoutUrl(), existing.getExpiresAt());
+      return checkoutMapper.toResponse(existing);
     }
     throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout creation is in progress.");
   }
@@ -421,13 +430,7 @@ public class BillingService {
     if (planId == null) {
       return null;
     }
-    return plans.findById(planId).map(value -> new BillingPlanSummary(
-        value.getId(),
-        value.getCode(),
-        value.getName(),
-        value.getBillingInterval(),
-        value.getAmount(),
-        value.getCurrency())).orElse(null);
+    return plans.findById(planId).map(planMapper::toSummary).orElse(null);
   }
 
   private OffsetDateTime activeOverride(BillingAccount account, OffsetDateTime currentTime) {
@@ -440,7 +443,7 @@ public class BillingService {
         .orElse(account.getOverrideEndsAt());
   }
 
-  private Object promotion(UUID accountId, OffsetDateTime currentTime) {
+  private BillingPromotionResponse promotion(UUID accountId, OffsetDateTime currentTime) {
     return eligibilities.findAllByBillingAccountIdOrderByGrantedAtDesc(accountId).stream()
         .findFirst()
         .flatMap(eligibility -> campaigns.findById(eligibility.getCampaignId())
@@ -448,7 +451,7 @@ public class BillingService {
         .orElse(null);
   }
 
-  private Map<String, Object> promotion(
+  private BillingPromotionResponse promotion(
       BillingPromotionCampaign campaign,
       BillingPromotionEligibility eligibility,
       OffsetDateTime currentTime) {
@@ -457,14 +460,7 @@ public class BillingService {
         && !eligibility.getFirstCheckoutEndsAt().isAfter(currentTime)
         ? BillingPromotionEligibilityStatus.EXPIRED
         : eligibility.getStatus();
-    LinkedHashMap<String, Object> value = new LinkedHashMap<>();
-    value.put("code", campaign.getCode());
-    value.put("name", campaign.getName());
-    value.put("status", status.name());
-    value.put("campaignEndsAt", campaign.getEndsAt());
-    value.put("firstCheckoutEndsAt", eligibility.getFirstCheckoutEndsAt());
-    value.put("lockedAt", eligibility.getLockedAt());
-    return value;
+    return promotionMapper.toResponse(campaign, eligibility, status.name());
   }
 
   private String accessStatus(
@@ -517,12 +513,8 @@ public class BillingService {
           if (promoted == null || comparison == null || !promoted.isActive()) {
             return null;
           }
-          LinkedHashMap<String, Object> promotion = new LinkedHashMap<>();
-          promotion.put("code", offer.campaign().getCode());
-          promotion.put("name", offer.campaign().getName());
-          promotion.put("campaignEndsAt", offer.campaign().getEndsAt());
-          promotion.put("offerEndsAt", offer.offerEndsAt());
-          promotion.put("retentionPolicy", offer.campaign().getRetentionPolicy());
+          PlanPromotionResponse promotion =
+              promotionMapper.toOfferResponse(offer.campaign(), offer.offerEndsAt());
           return planResponse(promoted, comparison.getAmount(), promotion);
         }))
         .filter(java.util.Objects::nonNull)
@@ -602,21 +594,14 @@ public class BillingService {
   private SubscriptionPlanResponse planResponse(
       BillingPlanPrice plan,
       Integer compareAtAmount,
-      Object promotion) {
+      PlanPromotionResponse promotion) {
     Double savings = compareAtAmount == null
         ? null
         : Math.round((1d - plan.getAmount() / (double) compareAtAmount) * 1000d) / 10d;
-    return new SubscriptionPlanResponse(
-        plan.getId(),
-        plan.getCode(),
-        plan.getName(),
-        plan.getBillingInterval(),
-        plan.getAmount(),
+    return planMapper.toResponse(
+        plan,
         compareAtAmount,
-        plan.getCurrency(),
-        plan.getTrialDays(),
         savings,
-        List.copyOf(plan.getAvailablePaymentMethods()),
         promotion);
   }
 
@@ -632,22 +617,8 @@ public class BillingService {
   }
 
   private BillingOverview emptyOverview() {
-    return new BillingOverview(
-        BillingAccountStatus.PENDING_PAYMENT.name(),
-        "BLOCKED",
-        null,
-        null,
-        null,
-        null,
-        false,
-        null,
-        null,
-        null,
-        List.of("PIX_AUTOMATIC", "CARD"),
-        false,
-        false,
-        false,
-        null);
+    return accountMapper.toEmptyOverview(
+        new BillingOverviewMappingSource(List.of("PIX_AUTOMATIC", "CARD")));
   }
 
   private String fingerprint(String email) {

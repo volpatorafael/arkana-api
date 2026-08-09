@@ -49,6 +49,12 @@ class ClientControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.items", hasSize(1)))
             .andExpect(jsonPath("$.items[0].id").value(firstUserClient.getId().toString()))
             .andExpect(jsonPath("$.items[0].name").value(firstUserClient.getName()))
+            .andExpect(jsonPath("$.items[0].email").isEmpty())
+            .andExpect(jsonPath("$.items[0].phone").isEmpty())
+            .andExpect(jsonPath("$.items[0].notes").isEmpty())
+            .andExpect(jsonPath("$.items[0].archivedAt").isEmpty())
+            .andExpect(jsonPath("$.items[0].createdAt").isNotEmpty())
+            .andExpect(jsonPath("$.items[0].updatedAt").isNotEmpty())
             .andExpect(jsonPath("$.page").value(1))
             .andExpect(jsonPath("$.pageSize").value(25))
             .andExpect(jsonPath("$.total").value(1));

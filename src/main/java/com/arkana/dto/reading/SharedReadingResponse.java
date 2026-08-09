@@ -12,5 +12,6 @@ public record SharedReadingResponse(
     String deckMode,
     OffsetDateTime completedAt,
     String readerDisplayName,
-    List<SharedReadingPositionResponse> positions) {
+    List<SharedReadingPositionResponse> positions,
+    List<SharedReadingCommentResponse> comments) {
 }

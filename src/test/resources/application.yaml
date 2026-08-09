@@ -1,6 +1,8 @@
 spring:
   main:
     banner-mode: off
+  cache:
+    type: none
   datasource:
     url: jdbc:h2:mem:arkana;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     username: sa

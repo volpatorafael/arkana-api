@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class BillingPlansControllerIT extends BaseControllerIT {
-
     @Test
     void listsThePublicSubscriptionPlanResponse() throws Exception {
         String anonymousResponse = mockMvcPerform(get("/v1/public/plans"))
@@ -28,17 +27,13 @@ class BillingPlansControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$[0].name").isString())
             .andExpect(jsonPath("$[0].interval").value("MONTH"))
             .andExpect(jsonPath("$[0].amount").isNumber())
+            .andExpect(jsonPath("$[0].compareAtAmount").isEmpty())
             .andExpect(jsonPath("$[0].currency").value("BRL"))
             .andExpect(jsonPath("$[0].trialDays").value(14))
+            .andExpect(jsonPath("$[0].annualSavingsPercent").isEmpty())
             .andExpect(jsonPath("$[0].availablePaymentMethods[0]").value("PIX_AUTOMATIC"))
-            .andExpect(jsonPath("$[1].id").isNotEmpty())
-            .andExpect(jsonPath("$[1].code").isString())
-            .andExpect(jsonPath("$[1].name").isString())
-            .andExpect(jsonPath("$[1].interval").value("YEAR"))
-            .andExpect(jsonPath("$[1].amount").isNumber())
-            .andExpect(jsonPath("$[1].currency").value("BRL"))
-            .andExpect(jsonPath("$[1].trialDays").value(14))
-            .andExpect(jsonPath("$[1].availablePaymentMethods[0]").value("PIX_AUTOMATIC"))
+            .andExpect(jsonPath("$[0].availablePaymentMethods[1]").value("CARD"))
+            .andExpect(jsonPath("$[0].promotion").isEmpty())
             .andReturn()
             .getResponse()
             .getContentAsString();

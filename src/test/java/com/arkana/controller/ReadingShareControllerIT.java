@@ -10,6 +10,7 @@ import com.arkana.domain.ReadingShareStatus;
 import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.SpreadPosition;
 import com.arkana.repository.ProfileRepository;
+import com.arkana.repository.ReadingCommentRepository;
 import com.arkana.repository.ReadingPositionRepository;
 import com.arkana.repository.ReadingRepository;
 import com.arkana.repository.ReadingShareRepository;
@@ -48,6 +49,8 @@ class ReadingShareControllerIT extends BaseControllerIT {
     private ReadingShareRepository shareRepository;
     @Autowired
     private ReadingRepository readingRepository;
+    @Autowired
+    private ReadingCommentRepository commentRepository;
     @Autowired
     private ReadingPositionRepository positionRepository;
     @Autowired
@@ -142,7 +145,9 @@ class ReadingShareControllerIT extends BaseControllerIT {
         reading.setContext("Contexto privado");
         reading.archive(now());
         readingRepository.saveAndFlush(reading);
-        entityGeneratorService.randomComment(firstUser, reading);
+        var comment = entityGeneratorService.randomComment(firstUser, reading);
+        comment.setBody("Comentario publico");
+        comment = commentRepository.saveAndFlush(comment);
         ReadingShare share = activeShare(reading);
 
         for (int access = 1; access <= 2; access++) {
@@ -153,15 +158,34 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.question").value("Qual caminho seguir?"))
                 .andExpect(jsonPath("$.readerDisplayName").value("Tarologa publica"))
                 .andExpect(jsonPath("$.spread.id").value("advice"))
+                .andExpect(jsonPath("$.spread.name").isNotEmpty())
                 .andExpect(jsonPath("$.deckMode").value("MAJOR"))
+                .andExpect(jsonPath("$.completedAt").isNotEmpty())
                 .andExpect(jsonPath("$.positions", hasSize(1)))
+                .andExpect(jsonPath("$.positions[0].key").isNotEmpty())
+                .andExpect(jsonPath("$.positions[0].order").isNumber())
+                .andExpect(jsonPath("$.positions[0].name").isNotEmpty())
+                .andExpect(jsonPath("$.positions[0].meaning").isNotEmpty())
+                .andExpect(jsonPath("$.positions[0].x").isNumber())
+                .andExpect(jsonPath("$.positions[0].y").isNumber())
+                .andExpect(jsonPath("$.positions[0].rotation").isNumber())
                 .andExpect(jsonPath("$.positions[0].card.id").value("the-fool"))
+                .andExpect(jsonPath("$.positions[0].card.number").value(0))
+                .andExpect(jsonPath("$.positions[0].card.suit").value("major"))
+                .andExpect(jsonPath("$.positions[0].card.name").isNotEmpty())
                 .andExpect(jsonPath("$.positions[0].orientation").value("UPRIGHT"))
+                .andExpect(jsonPath("$.positions[0].interpretation").value("Interpretacao publica"))
                 .andExpect(jsonPath("$.clientId").doesNotExist())
                 .andExpect(jsonPath("$.readingId").doesNotExist())
                 .andExpect(jsonPath("$.ownerId").doesNotExist())
                 .andExpect(jsonPath("$.context").doesNotExist())
-                .andExpect(jsonPath("$.comments").doesNotExist())
+                .andExpect(jsonPath("$.comments", hasSize(1)))
+                .andExpect(jsonPath("$.comments[0].id").value(comment.getId().toString()))
+                .andExpect(jsonPath("$.comments[0].body").value("Comentario publico"))
+                .andExpect(jsonPath("$.comments[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.comments[0].readingId").doesNotExist())
+                .andExpect(jsonPath("$.comments[0].ownerId").doesNotExist())
+                .andExpect(jsonPath("$.comments[0].updatedAt").doesNotExist())
                 .andExpect(jsonPath("$.email").doesNotExist());
         }
 

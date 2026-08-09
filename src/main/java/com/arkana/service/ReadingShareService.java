@@ -9,11 +9,11 @@ import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
 import com.arkana.dto.reading.ReadingShareResponse;
-import com.arkana.dto.reading.ReadingSpreadSummaryResponse;
-import com.arkana.dto.reading.SharedReadingPositionResponse;
 import com.arkana.dto.reading.SharedReadingResponse;
-import com.arkana.dto.reading.SharedTarotCardResponse;
+import com.arkana.mapper.ReadingShareMapper;
+import com.arkana.mapper.ReadingPositionMappingSource;
 import com.arkana.repository.ProfileRepository;
+import com.arkana.repository.ReadingCommentRepository;
 import com.arkana.repository.ReadingPositionRepository;
 import com.arkana.repository.ReadingRepository;
 import com.arkana.repository.ReadingShareRepository;
@@ -41,11 +41,13 @@ public class ReadingShareService {
 
   private final ReadingShareRepository shares;
   private final ReadingRepository readings;
+  private final ReadingCommentRepository comments;
   private final ReadingPositionRepository positions;
   private final SpreadRepository spreads;
   private final TarotCardRepository cards;
   private final ProfileRepository profiles;
   private final ProductAccessAuthorizer access;
+  private final ReadingShareMapper mapper;
 
   @Transactional
   public ReadingShareResponse create(UUID ownerId, UUID readingId) {
@@ -62,7 +64,7 @@ public class ReadingShareService {
         readingId,
         ReadingShareStatus.ACTIVE);
     if (current.isPresent() && current.get().getExpiresAt().isAfter(currentTime)) {
-      return response(current.get());
+      return mapper.toResponse(current.get());
     }
     current.ifPresent(ReadingShare::expire);
     shares.flush();
@@ -75,7 +77,7 @@ public class ReadingShareService {
         .expiresAt(currentTime.plusDays(EXPIRATION_DAYS))
         .accessCount(0)
         .build());
-    return response(created);
+    return mapper.toResponse(created);
   }
 
   @Transactional
@@ -114,54 +116,30 @@ public class ReadingShareService {
     Profile reader = profiles.findById(reading.getOwnerId()).orElseThrow();
     List<ReadingPosition> readingPositions =
         positions.findAllByReadingIdOrderByPositionOrderAsc(reading.getId());
-    Map<String, TarotCard> cardsById = cards.findAllById(readingPositions.stream()
+    List<TarotCard> readingCards = cards.findAllById(readingPositions.stream()
             .map(ReadingPosition::getCardId)
             .filter(java.util.Objects::nonNull)
-            .toList())
-        .stream()
+            .toList());
+    Map<String, TarotCard> cardsById = readingCards.stream()
         .collect(Collectors.toMap(TarotCard::getId, Function.identity()));
-
-    return Optional.of(new SharedReadingResponse(
-        share.getId(),
-        reading.getTitle(),
-        reading.getQuestion(),
-        new ReadingSpreadSummaryResponse(spread.getId(), spread.getNamePtBr()),
-        reading.getDeckMode().name(),
-        reading.getCompletedAt(),
-        reader.getDisplayName(),
-        readingPositions.stream()
-            .map(position -> position(position, cardsById.get(position.getCardId())))
-            .toList()));
-  }
-
-  private SharedReadingPositionResponse position(ReadingPosition position, TarotCard card) {
-    SharedTarotCardResponse cardResponse = card == null
-        ? null
-        : new SharedTarotCardResponse(
-            card.getId(),
-            card.getCardNumber(),
-            card.getSuit(),
-            card.getNamePtBr());
-    return new SharedReadingPositionResponse(
-        position.getPositionKey(),
-        position.getPositionOrder(),
-        position.getNamePtBr(),
-        position.getMeaningPtBr(),
-        position.getX(),
-        position.getY(),
-        position.getRotation(),
-        cardResponse,
-        position.getOrientation(),
-        position.getInterpretation());
+    List<ReadingPositionMappingSource> positionSources = readingPositions.stream()
+        .map(position -> new ReadingPositionMappingSource(
+            position,
+            cardsById.get(position.getCardId())))
+        .toList();
+    return Optional.of(mapper.toSharedResponse(
+        share,
+        spread,
+        reader,
+        positionSources,
+        comments.findAllByReadingIdAndOwnerIdOrderByCreatedAtAscIdAsc(
+            reading.getId(),
+            reading.getOwnerId())));
   }
 
   private Reading ownedReadingForUpdate(UUID ownerId, UUID readingId) {
     return readings.findByIdAndOwnerIdForUpdate(readingId, ownerId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reading not found."));
-  }
-
-  private ReadingShareResponse response(ReadingShare share) {
-    return new ReadingShareResponse(share.getId(), share.getReading().getId(), share.getCreatedAt());
   }
 
   private OffsetDateTime now() {

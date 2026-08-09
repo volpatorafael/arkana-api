@@ -8,5 +8,5 @@ public record BillingOverview(String status, String accessStatus, OffsetDateTime
                               OffsetDateTime currentPeriodEnd,
                               boolean cancelAtPeriodEnd, BillingPlanSummary currentPlan, BillingPlanSummary pendingPlan,
                               OffsetDateTime overrideEndsAt, List<String> availablePaymentMethods, boolean canCheckout,
-                              boolean canCancel, boolean canChangePlan, Object promotion) {
+                              boolean canCancel, boolean canChangePlan, BillingPromotionResponse promotion) {
 }

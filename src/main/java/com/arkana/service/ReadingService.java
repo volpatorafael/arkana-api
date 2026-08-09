@@ -10,9 +10,17 @@ import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
 import com.arkana.dto.reading.CreateReadingRequest;
+import com.arkana.dto.reading.ReadingCommentResponse;
+import com.arkana.dto.reading.ReadingPageResponse;
+import com.arkana.dto.reading.ReadingPositionResponse;
+import com.arkana.dto.reading.ReadingResponse;
 import com.arkana.dto.reading.SaveReadingCommentRequest;
 import com.arkana.dto.reading.SaveReadingPositionRequest;
 import com.arkana.dto.reading.UpdateReadingRequest;
+import com.arkana.mapper.ReadingMapper;
+import com.arkana.mapper.ReadingCommentMapper;
+import com.arkana.mapper.ReadingPositionMapper;
+import com.arkana.mapper.SpreadMapper;
 import com.arkana.repository.ClientRepository;
 import com.arkana.repository.ReadingCommentRepository;
 import com.arkana.repository.ReadingPositionRepository;
@@ -35,7 +43,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +61,10 @@ public class ReadingService {
   private final TarotCardRepository cards;
   private final ClientRepository clients;
   private final ProductAccessAuthorizer access;
+  private final ReadingMapper mapper;
+  private final ReadingPositionMapper positionMapper;
+  private final ReadingCommentMapper commentMapper;
+  private final SpreadMapper spreadMapper;
 
   private static String trim(String value) {
     return value == null || value.trim().isEmpty() ? null : value.trim();
@@ -71,16 +82,8 @@ public class ReadingService {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, detail);
   }
 
-  private static Map<String, Object> map(Object... values) {
-    Map<String, Object> result = new LinkedHashMap<>();
-    for (int index = 0; index < values.length; index += 2) {
-      result.put((String) values[index], values[index + 1]);
-    }
-    return result;
-  }
-
   @Transactional
-  public Map<String, Object> create(UUID owner, CreateReadingRequest request, String locale) {
+  public ReadingResponse create(UUID owner, CreateReadingRequest request, String locale) {
     access.requireAccess(owner);
     ReadingDeckMode deckMode = deckMode(request.deckMode());
     requireSpread(request.spreadId());
@@ -106,13 +109,13 @@ public class ReadingService {
   }
 
   @Transactional(readOnly = true)
-  public Map<String, Object> get(UUID owner, UUID id, String locale) {
+  public ReadingResponse get(UUID owner, UUID id, String locale) {
     access.requireAccess(owner);
     return response(reading(owner, id), locale);
   }
 
   @Transactional(readOnly = true)
-  public Map<String, Object> list(
+  public ReadingPageResponse list(
       UUID owner,
       int page,
       int pageSize,
@@ -155,17 +158,17 @@ public class ReadingService {
         Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id")));
     Page<Reading> result = readings.findAll(specification, pageable);
     Map<UUID, UUID> shareIds = activeShareIds(result.getContent(), now());
-    return map(
-        "items", result.getContent().stream()
-            .map(reading -> readingFields(reading, shareIds.get(reading.getId())))
+    return mapper.toPage(
+        result.getContent().stream()
+            .map(reading -> mapper.toSummary(reading, shareIds.get(reading.getId())))
             .toList(),
-        "page", page,
-        "pageSize", pageSize,
-        "total", result.getTotalElements());
+        page,
+        pageSize,
+        result.getTotalElements());
   }
 
   @Transactional
-  public Map<String, Object> update(UUID owner, UUID id, UpdateReadingRequest request, String locale) {
+  public ReadingResponse update(UUID owner, UUID id, UpdateReadingRequest request, String locale) {
     access.requireAccess(owner);
     Reading reading = requireInProgress(owner, id);
     ReadingDeckMode deckMode = reading.getDeckMode();
@@ -202,7 +205,7 @@ public class ReadingService {
   }
 
   @Transactional
-  public Map<String, Object> savePosition(
+  public ReadingPositionResponse savePosition(
       UUID owner,
       UUID readingId,
       UUID positionId,
@@ -234,11 +237,11 @@ public class ReadingService {
     TarotCard card = position.getCardId() == null
         ? null
         : cards.findById(position.getCardId()).orElse(null);
-    return position(position, card, locale);
+    return positionMapper.toResponse(position, card, locale);
   }
 
   @Transactional
-  public Map<String, Object> complete(UUID owner, UUID id, String locale) {
+  public ReadingResponse complete(UUID owner, UUID id, String locale) {
     access.requireAccess(owner);
     Reading reading = requireInProgress(owner, id);
     long incomplete = positions.countByReadingIdAndCardIdIsNull(id);
@@ -252,7 +255,7 @@ public class ReadingService {
   }
 
   @Transactional
-  public Map<String, Object> archive(UUID owner, UUID id, String locale) {
+  public ReadingResponse archive(UUID owner, UUID id, String locale) {
     access.requireAccess(owner);
     Reading reading = reading(owner, id);
     reading.archive(now());
@@ -260,7 +263,7 @@ public class ReadingService {
   }
 
   @Transactional
-  public Map<String, Object> restore(UUID owner, UUID id, String locale) {
+  public ReadingResponse restore(UUID owner, UUID id, String locale) {
     access.requireAccess(owner);
     Reading reading = reading(owner, id);
     reading.restore(now());
@@ -274,16 +277,18 @@ public class ReadingService {
   }
 
   @Transactional(readOnly = true)
-  public List<Map<String, Object>> comments(UUID owner, UUID readingId) {
+  public List<ReadingCommentResponse> comments(UUID owner, UUID readingId) {
     access.requireAccess(owner);
     reading(owner, readingId);
-    return comments.findAllByReadingIdAndOwnerIdOrderByCreatedAtAscIdAsc(readingId, owner).stream()
-        .map(this::comment)
-        .toList();
+    return commentMapper.toResponses(
+        comments.findAllByReadingIdAndOwnerIdOrderByCreatedAtAscIdAsc(readingId, owner));
   }
 
   @Transactional
-  public Map<String, Object> addComment(UUID owner, UUID readingId, SaveReadingCommentRequest request) {
+  public ReadingCommentResponse addComment(
+      UUID owner,
+      UUID readingId,
+      SaveReadingCommentRequest request) {
     access.requireAccess(owner);
     reading(owner, readingId);
     OffsetDateTime createdAt = now();
@@ -295,11 +300,11 @@ public class ReadingService {
         .createdAt(createdAt)
         .updatedAt(createdAt)
         .build());
-    return comment(comment);
+    return commentMapper.toResponse(comment);
   }
 
   @Transactional
-  public Map<String, Object> updateComment(
+  public ReadingCommentResponse updateComment(
       UUID owner,
       UUID readingId,
       UUID commentId,
@@ -309,7 +314,7 @@ public class ReadingService {
     ReadingComment comment = comments.findByIdAndReadingIdAndOwnerId(commentId, readingId, owner)
         .orElseThrow(() -> notFound("Comment not found."));
     comment.update(request.body().trim(), now());
-    return comment(comment);
+    return commentMapper.toResponse(comment);
   }
 
   @Transactional
@@ -406,38 +411,33 @@ public class ReadingService {
     }
   }
 
-  private Map<String, Object> response(Reading reading, String locale) {
+  private ReadingResponse response(Reading reading, String locale) {
     UUID readingShareId = shares.findFirstByReading_IdAndStatusAndExpiresAtAfter(
             reading.getId(),
             ReadingShareStatus.ACTIVE,
             now())
         .map(ReadingShare::getId)
         .orElse(null);
-    Map<String, Object> result = readingFields(reading, readingShareId);
     Spread spread = spreads.findById(reading.getSpreadId()).orElseThrow();
-    result.put("spread", map(
-        "id", spread.getId(),
-        "name", "en".equals(locale) ? spread.getNameEn() : spread.getNamePtBr()));
-    result.put("positions", positionResponses(reading.getId(), locale));
-    return result;
-  }
-
-  private Map<String, Object> readingFields(Reading reading, UUID readingShareId) {
-    return map(
-        "id", reading.getId(),
-        "clientId", reading.getClientId(),
-        "readingShareId", readingShareId,
-        "spreadId", reading.getSpreadId(),
-        "deckMode", reading.getDeckMode().name(),
-        "status", reading.getStatus().name(),
-        "title", reading.getTitle(),
-        "question", reading.getQuestion(),
-        "context", reading.getContext(),
-        "startedAt", reading.getStartedAt(),
-        "completedAt", reading.getCompletedAt(),
-        "archivedAt", reading.getArchivedAt(),
-        "createdAt", reading.getCreatedAt(),
-        "updatedAt", reading.getUpdatedAt());
+    List<ReadingPosition> readingPositions =
+        positions.findAllByReadingIdOrderByPositionOrderAsc(reading.getId());
+    List<TarotCard> readingCards = cards.findAllById(readingPositions.stream()
+        .map(ReadingPosition::getCardId)
+        .filter(java.util.Objects::nonNull)
+        .toList());
+    Map<String, TarotCard> cardsById = readingCards.stream()
+        .collect(Collectors.toMap(TarotCard::getId, Function.identity()));
+    List<ReadingPositionResponse> positionResponses = readingPositions.stream()
+        .map(position -> positionMapper.toResponse(
+            position,
+            cardsById.get(position.getCardId()),
+            locale))
+        .toList();
+    return mapper.toResponse(
+        reading,
+        readingShareId,
+        spreadMapper.toSummaryResponse(spread, locale),
+        positionResponses);
   }
 
   private Map<UUID, UUID> activeShareIds(
@@ -454,52 +454,4 @@ public class ReadingService {
         .collect(Collectors.toMap(share -> share.getReading().getId(), ReadingShare::getId));
   }
 
-  private List<Map<String, Object>> positionResponses(UUID readingId, String locale) {
-    List<ReadingPosition> readingPositions = positions.findAllByReadingIdOrderByPositionOrderAsc(readingId);
-    Map<String, TarotCard> cardsById = cards.findAllById(readingPositions.stream()
-            .map(ReadingPosition::getCardId)
-            .filter(java.util.Objects::nonNull)
-            .toList())
-        .stream()
-        .collect(Collectors.toMap(TarotCard::getId, Function.identity()));
-    return readingPositions.stream()
-        .map(position -> position(position, cardsById.get(position.getCardId()), locale))
-        .toList();
-  }
-
-  private Map<String, Object> position(
-      ReadingPosition position,
-      TarotCard card,
-      String locale) {
-    Object cardValue = card == null
-        ? null
-        : map(
-        "id", card.getId(),
-        "number", card.getCardNumber(),
-        "suit", card.getSuit(),
-        "name", "en".equals(locale) ? card.getNameEn() : card.getNamePtBr());
-    return map(
-        "id", position.getId(),
-        "key", position.getPositionKey(),
-        "order", position.getPositionOrder(),
-        "name", "en".equals(locale) ? position.getNameEn() : position.getNamePtBr(),
-        "meaning", "en".equals(locale) ? position.getMeaningEn() : position.getMeaningPtBr(),
-        "x", position.getX(),
-        "y", position.getY(),
-        "rotation", position.getRotation(),
-        "card", cardValue,
-        "orientation", position.getOrientation(),
-        "interpretation", position.getInterpretation(),
-        "createdAt", position.getCreatedAt(),
-        "updatedAt", position.getUpdatedAt());
-  }
-
-  private Map<String, Object> comment(ReadingComment comment) {
-    return map(
-        "id", comment.getId(),
-        "readingId", comment.getReadingId(),
-        "body", comment.getBody(),
-        "createdAt", comment.getCreatedAt(),
-        "updatedAt", comment.getUpdatedAt());
-  }
 }

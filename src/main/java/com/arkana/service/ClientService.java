@@ -37,8 +37,7 @@ public class ClientService {
     Page<Client> result = archived
         ? repository.findAllByOwnerIdAndArchivedAtIsNotNull(userId, pageable)
         : repository.findAllByOwnerIdAndArchivedAtIsNull(userId, pageable);
-    return new ClientPageResponse(result.getContent().stream().map(mapper::toResponse).toList(),
-        page, pageSize, result.getTotalElements());
+    return mapper.toPage(result.getContent(), page, pageSize, result.getTotalElements());
   }
 
   @Transactional
