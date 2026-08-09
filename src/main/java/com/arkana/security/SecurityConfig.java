@@ -2,6 +2,7 @@ package com.arkana.security;
 
 import com.arkana.config.ArkanaProperties;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -24,6 +25,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import static com.arkana.exception.GlobalExceptionHandler.ERROR_MESSAGE;
+
+@Slf4j
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -45,12 +49,15 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(Customizer.withDefaults())
-                        .authenticationEntryPoint((request, response, exception) -> writeError(
-                                request.getRequestURI(),
-                                response,
-                                HttpStatus.UNAUTHORIZED,
-                                "A valid access token is required.",
-                                objectMapper)))
+                        .authenticationEntryPoint((request, response, exception) -> {
+                            log.info(ERROR_MESSAGE, request.getMethod(), request.getRequestURI(), HttpStatus.UNAUTHORIZED, "Unauthorized", exception.getMessage());
+                            writeError(
+                                    request.getRequestURI(),
+                                    response,
+                                    HttpStatus.UNAUTHORIZED,
+                                    "A valid access token is required.",
+                                    objectMapper);
+                        }))
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> writeError(
                         request.getRequestURI(),
                         response,

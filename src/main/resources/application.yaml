@@ -19,7 +19,8 @@ spring:
         jwt:
           issuer-uri: ${OAUTH2_ISSUER_URI}
           jwk-set-uri: ${OAUTH2_JWK_SET_URI}
-          audiences: ${OAUTH2_AUDIENCE}
+          audiences: authenticated
+          jws-algorithms: ES256
 
 arkana:
   resend:

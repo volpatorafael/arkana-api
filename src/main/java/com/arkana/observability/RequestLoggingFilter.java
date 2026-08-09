@@ -28,10 +28,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             "(?i)(webhookSecret|password|secret|token|key)=([^&]*)");
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String method = request.getMethod();
         String uri = requestUri(request);
         boolean management = request.getRequestURI().startsWith(MANAGEMENT_PATH_PREFIX);

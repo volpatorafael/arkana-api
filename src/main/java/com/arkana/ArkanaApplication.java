@@ -6,10 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class ArkanaApiApplication {
+public class ArkanaApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ArkanaApiApplication.class, args);
+        SpringApplication.run(ArkanaApplication.class, args);
     }
 
 }

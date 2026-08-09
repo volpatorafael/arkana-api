@@ -14,7 +14,6 @@ spring:
         jwt:
           issuer-uri: https://gkjmdasjrapvegjywcof.supabase.co/auth/v1
           jwk-set-uri: https://gkjmdasjrapvegjywcof.supabase.co/auth/v1/.well-known/jwks.json
-          audiences: authenticated
 
 arkana:
   cors:

@@ -28,7 +28,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-    private static final String ERROR_MESSAGE = "ERR [{} {}] {} {} - {}";
+    public static final String ERROR_MESSAGE = "ERR [{} {}] {} {} - {}";
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
