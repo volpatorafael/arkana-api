@@ -11,6 +11,7 @@ import com.arkana.domain.Profile;
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
 import com.arkana.domain.ReadingPosition;
+import com.arkana.domain.ReadingShare;
 import com.arkana.domain.SpreadPosition;
 import com.arkana.repository.BillingAccountRepository;
 import com.arkana.repository.BillingCheckoutRepository;
@@ -23,6 +24,7 @@ import com.arkana.repository.ProfileRepository;
 import com.arkana.repository.ReadingCommentRepository;
 import com.arkana.repository.ReadingPositionRepository;
 import com.arkana.repository.ReadingRepository;
+import com.arkana.repository.ReadingShareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +45,7 @@ public class EntityGeneratorService {
     private final ReadingRepository readingRepository;
     private final ReadingPositionRepository positionRepository;
     private final ReadingCommentRepository commentRepository;
+    private final ReadingShareRepository shareRepository;
 
     public Profile randomProfile() {
         return profileRepository.saveAndFlush(TestDataGenerator.randomProfile().build());
@@ -99,5 +102,9 @@ public class EntityGeneratorService {
 
     public ReadingComment randomComment(Profile owner, Reading reading) {
         return commentRepository.saveAndFlush(TestDataGenerator.randomComment(owner, reading).build());
+    }
+
+    public ReadingShare randomReadingShare(Reading reading) {
+        return shareRepository.saveAndFlush(TestDataGenerator.randomReadingShare(reading).build());
     }
 }

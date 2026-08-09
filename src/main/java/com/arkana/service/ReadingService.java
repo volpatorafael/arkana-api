@@ -4,6 +4,8 @@ import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
 import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.ReadingPosition;
+import com.arkana.domain.ReadingShare;
+import com.arkana.domain.ReadingShareStatus;
 import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
@@ -15,6 +17,7 @@ import com.arkana.repository.ClientRepository;
 import com.arkana.repository.ReadingCommentRepository;
 import com.arkana.repository.ReadingPositionRepository;
 import com.arkana.repository.ReadingRepository;
+import com.arkana.repository.ReadingShareRepository;
 import com.arkana.repository.SpreadPositionRepository;
 import com.arkana.repository.SpreadRepository;
 import com.arkana.repository.TarotCardRepository;
@@ -45,6 +48,7 @@ public class ReadingService {
   private final ReadingRepository readings;
   private final ReadingPositionRepository positions;
   private final ReadingCommentRepository comments;
+  private final ReadingShareRepository shares;
   private final SpreadRepository spreads;
   private final SpreadPositionRepository spreadPositions;
   private final TarotCardRepository cards;
@@ -150,8 +154,11 @@ public class ReadingService {
         pageSize,
         Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id")));
     Page<Reading> result = readings.findAll(specification, pageable);
+    Map<UUID, UUID> shareIds = activeShareIds(result.getContent(), now());
     return map(
-        "items", result.getContent().stream().map(this::readingFields).toList(),
+        "items", result.getContent().stream()
+            .map(reading -> readingFields(reading, shareIds.get(reading.getId())))
+            .toList(),
         "page", page,
         "pageSize", pageSize,
         "total", result.getTotalElements());
@@ -400,7 +407,13 @@ public class ReadingService {
   }
 
   private Map<String, Object> response(Reading reading, String locale) {
-    Map<String, Object> result = readingFields(reading);
+    UUID readingShareId = shares.findFirstByReading_IdAndStatusAndExpiresAtAfter(
+            reading.getId(),
+            ReadingShareStatus.ACTIVE,
+            now())
+        .map(ReadingShare::getId)
+        .orElse(null);
+    Map<String, Object> result = readingFields(reading, readingShareId);
     Spread spread = spreads.findById(reading.getSpreadId()).orElseThrow();
     result.put("spread", map(
         "id", spread.getId(),
@@ -409,10 +422,11 @@ public class ReadingService {
     return result;
   }
 
-  private Map<String, Object> readingFields(Reading reading) {
+  private Map<String, Object> readingFields(Reading reading, UUID readingShareId) {
     return map(
         "id", reading.getId(),
         "clientId", reading.getClientId(),
+        "readingShareId", readingShareId,
         "spreadId", reading.getSpreadId(),
         "deckMode", reading.getDeckMode().name(),
         "status", reading.getStatus().name(),
@@ -424,6 +438,20 @@ public class ReadingService {
         "archivedAt", reading.getArchivedAt(),
         "createdAt", reading.getCreatedAt(),
         "updatedAt", reading.getUpdatedAt());
+  }
+
+  private Map<UUID, UUID> activeShareIds(
+      List<Reading> page,
+      OffsetDateTime currentTime) {
+    if (page.isEmpty()) {
+      return Map.of();
+    }
+    return shares.findAllByReading_IdInAndStatusAndExpiresAtAfter(
+            page.stream().map(Reading::getId).toList(),
+            ReadingShareStatus.ACTIVE,
+            currentTime)
+        .stream()
+        .collect(Collectors.toMap(share -> share.getReading().getId(), ReadingShare::getId));
   }
 
   private List<Map<String, Object>> positionResponses(UUID readingId, String locale) {

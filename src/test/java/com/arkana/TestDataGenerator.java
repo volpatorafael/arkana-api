@@ -17,6 +17,8 @@ import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
 import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.ReadingPosition;
+import com.arkana.domain.ReadingShare;
+import com.arkana.domain.ReadingShareStatus;
 import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.SpreadPosition;
 import lombok.NoArgsConstructor;
@@ -181,9 +183,29 @@ public final class TestDataGenerator {
             .updatedAt(now);
     }
 
+    public static ReadingShare.ReadingShareBuilder randomReadingShare(Reading reading) {
+        return ReadingShare.builder()
+            .id(UUID.randomUUID())
+            .reading(reading)
+            .status(randomValue(List.of(ReadingShareStatus.values())))
+            .createdAt(randomPastDate())
+            .expiresAt(randomFutureDate())
+            .accessCount(ThreadLocalRandom.current().nextLong(0, 10_000));
+    }
+
     private static OffsetDateTime randomDate() {
         long randomDays = ThreadLocalRandom.current().nextLong(-365, 366);
         return OffsetDateTime.now(ZoneOffset.UTC).plusDays(randomDays);
+    }
+
+    private static OffsetDateTime randomPastDate() {
+        return OffsetDateTime.now(ZoneOffset.UTC)
+            .minusDays(ThreadLocalRandom.current().nextLong(1, 366));
+    }
+
+    private static OffsetDateTime randomFutureDate() {
+        return OffsetDateTime.now(ZoneOffset.UTC)
+            .plusDays(ThreadLocalRandom.current().nextLong(1, 366));
     }
 
     private static String randomText(String prefix) {

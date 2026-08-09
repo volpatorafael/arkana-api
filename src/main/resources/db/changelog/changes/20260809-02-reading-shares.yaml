@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260809-02-01-create-reading-shares
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: reading_shares
+      changes:
+        - sql:
+            sql: >-
+              create table reading_shares (
+                id uuid primary key,
+                reading_id uuid not null references readings(id) on delete cascade,
+                status varchar(16) not null,
+                created_at timestamp with time zone not null,
+                expires_at timestamp with time zone not null,
+                access_count bigint not null default 0,
+                constraint reading_shares_status_check
+                  check (status in ('ACTIVE', 'EXPIRED', 'CANCELED')),
+                constraint reading_shares_access_count_check
+                  check (access_count >= 0),
+                constraint reading_shares_expiration_check
+                  check (expires_at > created_at)
+              )
+        - createIndex:
+            tableName: reading_shares
+            indexName: reading_shares_reading_status_expiration_idx
+            columns:
+              - column:
+                  name: reading_id
+              - column:
+                  name: status
+              - column:
+                  name: expires_at
+
+  - changeSet:
+      id: 20260809-02-02-one-active-share-per-reading
+      author: arkana
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: >-
+              create unique index reading_shares_one_active_idx
+              on reading_shares(reading_id)
+              where status = 'ACTIVE'
