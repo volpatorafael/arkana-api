@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -26,7 +28,8 @@ public class BillingProviderEvent {
   @Id
   private UUID id;
   @Column(nullable = false, length = 32)
-  private String provider;
+  @Enumerated(EnumType.STRING)
+  private BillingProvider provider;
   @Column(name = "provider_event_id", nullable = false, length = 200)
   private String providerEventId;
   @Column(name = "event_type", nullable = false, length = 160)

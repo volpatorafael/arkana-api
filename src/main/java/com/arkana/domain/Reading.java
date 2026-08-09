@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -30,9 +32,11 @@ public class Reading {
   @Column(name = "spread_id", nullable = false, length = 80)
   private String spreadId;
   @Column(name = "deck_mode", nullable = false, length = 8)
-  private String deckMode;
+  @Enumerated(EnumType.STRING)
+  private ReadingDeckMode deckMode;
   @Column(nullable = false, length = 16)
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private ReadingStatus status;
   @Column(length = 200)
   private String title;
   @Column(length = 5000)
@@ -56,7 +60,7 @@ public class Reading {
       boolean spreadPresent,
       String spreadId,
       boolean deckPresent,
-      String deckMode,
+      ReadingDeckMode deckMode,
       boolean titlePresent,
       String title,
       boolean questionPresent,
@@ -86,7 +90,7 @@ public class Reading {
   }
 
   public void complete(OffsetDateTime completedAt) {
-    status = "COMPLETED";
+    status = ReadingStatus.COMPLETED;
     this.completedAt = completedAt;
     updatedAt = completedAt;
   }

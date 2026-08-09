@@ -1,5 +1,6 @@
 package com.arkana.service;
 
+import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
 import com.arkana.dto.catalog.SpreadPositionResponse;
@@ -27,11 +28,15 @@ public class CatalogService {
   public List<TarotCardResponse> cards(UUID userId, String deckMode, String locale) {
     access.requireAccess(userId);
     String normalizedLocale = locale(locale);
-    String normalizedMode = deckMode == null ? "FULL" : deckMode;
-    if (!normalizedMode.equals("FULL") && !normalizedMode.equals("MAJOR")) {
+    ReadingDeckMode normalizedMode;
+    try {
+      normalizedMode = deckMode == null
+          ? ReadingDeckMode.FULL
+          : ReadingDeckMode.valueOf(deckMode);
+    } catch (IllegalArgumentException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deckMode must be FULL or MAJOR.");
     }
-    List<TarotCard> rows = normalizedMode.equals("MAJOR")
+    List<TarotCard> rows = normalizedMode == ReadingDeckMode.MAJOR
         ? cards.findAllBySuitOrderByCardNumberAsc("major")
         : cards.findAllByOrderBySuitAscCardNumberAsc();
     return rows.stream().map(card -> card(card, normalizedLocale)).toList();

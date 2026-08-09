@@ -1,6 +1,7 @@
 package com.arkana.service;
 
 import com.arkana.domain.BillingAccount;
+import com.arkana.domain.BillingAccountStatus;
 import com.arkana.repository.BillingAccessOverrideRepository;
 import com.arkana.repository.BillingAccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,11 +27,11 @@ public class BillingAccessEvaluator {
       return false;
     }
     BillingAccount value = account.get();
-    boolean trial = "TRIALING".equals(value.getStatus())
+    boolean trial = value.getStatus() == BillingAccountStatus.TRIALING
         && value.getTrialEndsAt() != null
         && value.getTrialEndsAt().isAfter(now);
-    boolean subscription = ("ACTIVE".equals(value.getStatus())
-        || "CANCEL_AT_PERIOD_END".equals(value.getStatus()))
+    boolean subscription = (value.getStatus() == BillingAccountStatus.ACTIVE
+        || value.getStatus() == BillingAccountStatus.CANCEL_AT_PERIOD_END)
         && value.getCurrentPeriodEnd() != null
         && value.getCurrentPeriodEnd().isAfter(now);
     boolean legacyOverride = value.getOverrideEndsAt() != null

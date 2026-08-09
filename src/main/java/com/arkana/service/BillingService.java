@@ -1,11 +1,16 @@
 package com.arkana.service;
 
 import com.arkana.domain.BillingAccount;
+import com.arkana.domain.BillingAccountStatus;
 import com.arkana.domain.BillingCheckout;
+import com.arkana.domain.BillingCheckoutStatus;
+import com.arkana.domain.BillingPaymentMethod;
 import com.arkana.domain.BillingPlanPrice;
 import com.arkana.domain.BillingPromotionCampaign;
 import com.arkana.domain.BillingPromotionCampaignPrice;
 import com.arkana.domain.BillingPromotionEligibility;
+import com.arkana.domain.BillingPromotionEligibilityStatus;
+import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderEvent;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
@@ -55,7 +60,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BillingService {
-  private static final String PAYMENT_PROVIDER = "ABACATEPAY";
+  private static final BillingProvider PAYMENT_PROVIDER = BillingProvider.ABACATEPAY;
 
   private final BillingAccountRepository accounts;
   private final BillingPlanPriceRepository plans;
@@ -99,7 +104,7 @@ public class BillingService {
         .id(UUID.randomUUID())
         .ownerId(ownerId)
         .trialEmailFingerprint(emailFingerprint)
-        .status("TRIALING")
+        .status(BillingAccountStatus.TRIALING)
         .trialStartedAt(startedAt)
         .trialEndsAt(startedAt.plusDays(14))
         .build());
@@ -109,7 +114,7 @@ public class BillingService {
             .id(UUID.randomUUID())
             .billingAccountId(account.getId())
             .campaignId(campaign.getId())
-            .status("ELIGIBLE")
+            .status(BillingPromotionEligibilityStatus.ELIGIBLE)
             .grantedAt(startedAt)
             .firstCheckoutEndsAt(startedAt.plusDays(14).plusHours(48))
             .build())
@@ -133,14 +138,14 @@ public class BillingService {
     }
     BillingAccount value = account.get();
     OffsetDateTime currentTime = now();
-    String effectiveStatus = "TRIALING".equals(value.getStatus())
+    BillingAccountStatus effectiveStatus = value.getStatus() == BillingAccountStatus.TRIALING
         && value.getTrialEndsAt() != null
         && !value.getTrialEndsAt().isAfter(currentTime)
-        ? "EXPIRED"
+        ? BillingAccountStatus.EXPIRED
         : value.getStatus();
     OffsetDateTime overrideEnd = activeOverride(value, currentTime);
     return new BillingOverview(
-        effectiveStatus,
+        effectiveStatus.name(),
         accessStatus(value, overrideEnd, currentTime),
         value.getTrialStartedAt(),
         value.getTrialEndsAt(),
@@ -151,23 +156,26 @@ public class BillingService {
         plan(value.getPendingPlanPriceId()),
         overrideEnd,
         List.of("PIX_AUTOMATIC", "CARD"),
-        List.of("PENDING_PAYMENT", "EXPIRED", "CANCELED").contains(effectiveStatus),
-        List.of("ACTIVE", "CANCEL_AT_PERIOD_END").contains(value.getStatus()),
-        "ACTIVE".equals(value.getStatus()),
+        List.of(
+            BillingAccountStatus.PENDING_PAYMENT,
+            BillingAccountStatus.EXPIRED,
+            BillingAccountStatus.CANCELED).contains(effectiveStatus),
+        List.of(
+            BillingAccountStatus.ACTIVE,
+            BillingAccountStatus.CANCEL_AT_PERIOD_END).contains(value.getStatus()),
+        value.getStatus() == BillingAccountStatus.ACTIVE,
         promotion(value.getId(), currentTime));
   }
 
   @Transactional
   public BillingCheckoutResponse checkout(UUID ownerId, UUID key, CreateBillingCheckoutRequest request) {
-    if (!List.of("PIX_AUTOMATIC", "CARD").contains(request.paymentMethod())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is not available.");
-    }
+    BillingPaymentMethod paymentMethod = paymentMethod(request.paymentMethod());
 
     BillingAccount account = account(ownerId);
     Optional<BillingCheckout> existing =
         checkouts.findByBillingAccountIdAndIdempotencyKey(account.getId(), key);
     if (existing.isPresent()) {
-      return existingCheckout(existing.get(), request);
+      return existingCheckout(existing.get(), request.planPriceId(), paymentMethod);
     }
 
     OffsetDateTime currentTime = now();
@@ -193,8 +201,8 @@ public class BillingService {
         .id(checkoutId)
         .billingAccountId(account.getId())
         .planPriceId(selectedPlan.getId())
-        .paymentMethod(request.paymentMethod())
-        .status("CREATING")
+        .paymentMethod(paymentMethod)
+        .status(BillingCheckoutStatus.CREATING)
         .idempotencyKey(key)
         .provider(PAYMENT_PROVIDER)
         .expiresAt(currentTime.plusMinutes(30))
@@ -204,7 +212,7 @@ public class BillingService {
           account.getId().toString(),
           checkoutId.toString(),
           mapping.getProviderProductId(),
-          request.paymentMethod());
+          paymentMethod);
       checkout.pending(
           providerCheckout.providerId(),
           providerCheckout.url(),
@@ -224,7 +232,11 @@ public class BillingService {
     provider.cancel(subscription(account.getId()).getProviderSubscriptionId());
     OffsetDateTime currentTime = now();
     account.cancelAtPeriodEnd();
-    eligibilities.findAllByBillingAccountIdAndStatusIn(account.getId(), List.of("ELIGIBLE", "LOCKED"))
+    eligibilities.findAllByBillingAccountIdAndStatusIn(
+            account.getId(),
+            List.of(
+                BillingPromotionEligibilityStatus.ELIGIBLE,
+                BillingPromotionEligibilityStatus.LOCKED))
         .forEach(eligibility -> eligibility.forfeit(currentTime));
     return overview(ownerId);
   }
@@ -266,16 +278,17 @@ public class BillingService {
     }
 
     String eventType = (String) event.get("event");
-    String status = switch (eventType) {
-      case "subscription.completed", "subscription.renewed", "subscription.plan_changed" -> "ACTIVE";
-      case "subscription.payment_failed" -> "PAST_DUE";
-      case "subscription.cancelled" -> "CANCELED";
-      default -> "TRIALING";
+    BillingAccountStatus status = switch (eventType) {
+      case "subscription.completed", "subscription.renewed", "subscription.plan_changed" ->
+          BillingAccountStatus.ACTIVE;
+      case "subscription.payment_failed" -> BillingAccountStatus.PAST_DUE;
+      case "subscription.cancelled" -> BillingAccountStatus.CANCELED;
+      default -> BillingAccountStatus.TRIALING;
     };
     OffsetDateTime periodStart = (OffsetDateTime) event.get("periodStart");
     OffsetDateTime periodEnd = (OffsetDateTime) event.get("periodEnd");
     OffsetDateTime trialEnd = (OffsetDateTime) event.get("trialEnd");
-    if ("ACTIVE".equals(status) && periodEnd == null) {
+    if (status == BillingAccountStatus.ACTIVE && periodEnd == null) {
       periodStart = periodStart == null ? now() : periodStart;
       periodEnd = "YEAR".equals(context.interval())
           ? periodStart.plusYears(1)
@@ -296,9 +309,10 @@ public class BillingService {
 
   private BillingCheckoutResponse existingCheckout(
       BillingCheckout existing,
-      CreateBillingCheckoutRequest request) {
-    if (!existing.getPlanPriceId().equals(request.planPriceId())
-        || !existing.getPaymentMethod().equals(request.paymentMethod())) {
+      UUID planPriceId,
+      BillingPaymentMethod paymentMethod) {
+    if (!existing.getPlanPriceId().equals(planPriceId)
+        || existing.getPaymentMethod() != paymentMethod) {
       throw new ResponseStatusException(
           HttpStatus.CONFLICT,
           "Idempotency-Key was reused with different parameters.");
@@ -307,6 +321,14 @@ public class BillingService {
       return new BillingCheckoutResponse(existing.getId(), existing.getCheckoutUrl(), existing.getExpiresAt());
     }
     throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout creation is in progress.");
+  }
+
+  private BillingPaymentMethod paymentMethod(String value) {
+    try {
+      return BillingPaymentMethod.valueOf(value);
+    } catch (IllegalArgumentException exception) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is not available.");
+    }
   }
 
   private void updateProviderSubscription(Map<String, Object> event, UUID accountId) {
@@ -334,7 +356,10 @@ public class BillingService {
       return;
     }
     OffsetDateTime lockedAt = now();
-    eligibilities.findAllByBillingAccountIdAndCampaignIdInAndStatus(accountId, campaignIds, "ELIGIBLE")
+    eligibilities.findAllByBillingAccountIdAndCampaignIdInAndStatus(
+            accountId,
+            campaignIds,
+            BillingPromotionEligibilityStatus.ELIGIBLE)
         .forEach(eligibility -> eligibility.lock(lockedAt));
   }
 
@@ -427,14 +452,15 @@ public class BillingService {
       BillingPromotionCampaign campaign,
       BillingPromotionEligibility eligibility,
       OffsetDateTime currentTime) {
-    String status = "ELIGIBLE".equals(eligibility.getStatus())
+    BillingPromotionEligibilityStatus status =
+        eligibility.getStatus() == BillingPromotionEligibilityStatus.ELIGIBLE
         && !eligibility.getFirstCheckoutEndsAt().isAfter(currentTime)
-        ? "EXPIRED"
+        ? BillingPromotionEligibilityStatus.EXPIRED
         : eligibility.getStatus();
     LinkedHashMap<String, Object> value = new LinkedHashMap<>();
     value.put("code", campaign.getCode());
     value.put("name", campaign.getName());
-    value.put("status", status);
+    value.put("status", status.name());
     value.put("campaignEndsAt", campaign.getEndsAt());
     value.put("firstCheckoutEndsAt", eligibility.getFirstCheckoutEndsAt());
     value.put("lockedAt", eligibility.getLockedAt());
@@ -445,10 +471,12 @@ public class BillingService {
       BillingAccount account,
       OffsetDateTime overrideEnd,
       OffsetDateTime currentTime) {
-    boolean trial = "TRIALING".equals(account.getStatus())
+    boolean trial = account.getStatus() == BillingAccountStatus.TRIALING
         && account.getTrialEndsAt() != null
         && account.getTrialEndsAt().isAfter(currentTime);
-    boolean subscription = List.of("ACTIVE", "CANCEL_AT_PERIOD_END").contains(account.getStatus())
+    boolean subscription = List.of(
+        BillingAccountStatus.ACTIVE,
+        BillingAccountStatus.CANCEL_AT_PERIOD_END).contains(account.getStatus())
         && account.getCurrentPeriodEnd() != null
         && account.getCurrentPeriodEnd().isAfter(currentTime);
     boolean override = overrideEnd != null && overrideEnd.isAfter(currentTime);
@@ -509,7 +537,12 @@ public class BillingService {
 
   private List<CampaignOffer> eligibleOffers(UUID accountId, OffsetDateTime currentTime) {
     List<BillingPromotionEligibility> activeEligibilities =
-        eligibilities.findAllByBillingAccountIdAndStatusIn(accountId, List.of("ELIGIBLE", "LOCKED")).stream()
+        eligibilities.findAllByBillingAccountIdAndStatusIn(
+                accountId,
+                List.of(
+                    BillingPromotionEligibilityStatus.ELIGIBLE,
+                    BillingPromotionEligibilityStatus.LOCKED))
+            .stream()
             .filter(eligibility -> eligibility.getFirstCheckoutEndsAt().isAfter(currentTime))
             .toList();
     Map<UUID, BillingPromotionEligibility> eligibilityByCampaign = activeEligibilities.stream()
@@ -556,7 +589,12 @@ public class BillingService {
     if (campaignIds.isEmpty()) {
       return false;
     }
-    return eligibilities.findAllByBillingAccountIdAndStatusIn(accountId, List.of("ELIGIBLE", "LOCKED")).stream()
+    return eligibilities.findAllByBillingAccountIdAndStatusIn(
+            accountId,
+            List.of(
+                BillingPromotionEligibilityStatus.ELIGIBLE,
+                BillingPromotionEligibilityStatus.LOCKED))
+        .stream()
         .anyMatch(eligibility -> campaignIds.contains(eligibility.getCampaignId())
             && eligibility.getFirstCheckoutEndsAt().isAfter(currentTime));
   }
@@ -595,7 +633,7 @@ public class BillingService {
 
   private BillingOverview emptyOverview() {
     return new BillingOverview(
-        "PENDING_PAYMENT",
+        BillingAccountStatus.PENDING_PAYMENT.name(),
         "BLOCKED",
         null,
         null,

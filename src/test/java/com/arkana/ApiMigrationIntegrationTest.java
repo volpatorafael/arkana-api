@@ -2,9 +2,12 @@ package com.arkana;
 
 import com.arkana.domain.BillingAccount;
 import com.arkana.domain.BillingCheckout;
+import com.arkana.domain.BillingCheckoutStatus;
+import com.arkana.domain.BillingPaymentMethod;
 import com.arkana.domain.BillingPlanPrice;
 import com.arkana.domain.BillingPromotionCampaign;
 import com.arkana.domain.BillingPromotionCampaignPrice;
+import com.arkana.domain.BillingProvider;
 import com.arkana.domain.Profile;
 import com.arkana.repository.BillingAccountRepository;
 import com.arkana.repository.BillingCheckoutRepository;
@@ -233,10 +236,10 @@ class ApiMigrationIntegrationTest {
         .id(checkout)
         .billingAccountId(account.getId())
         .planPriceId(UUID.fromString("30000000-0000-0000-0000-000000000001"))
-        .paymentMethod("PIX_AUTOMATIC")
-        .status("PENDING")
+        .paymentMethod(BillingPaymentMethod.PIX_AUTOMATIC)
+        .status(BillingCheckoutStatus.PENDING)
         .idempotencyKey(UUID.randomUUID())
-        .provider("ABACATEPAY")
+        .provider(BillingProvider.ABACATEPAY)
         .expiresAt(now.plusMinutes(30))
         .build());
     String payload = "{\"id\":\"evt-1\",\"event\":\"subscription.completed\",\"data\":{\"subscription\":{\"id\":\"sub-1\",\"currentPeriodStart\":\"" + now + "\",\"currentPeriodEnd\":\"" + now.plusMonths(

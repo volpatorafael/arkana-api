@@ -1,5 +1,6 @@
 package com.arkana.integration.abacatepay;
 
+import com.arkana.domain.BillingPaymentMethod;
 import com.arkana.integration.PaymentProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -52,13 +53,17 @@ public class AbacatePayProvider implements PaymentProvider {
   }
 
   @Override
-  public Checkout createCheckout(String account, String checkout, String product, String method) {
+  public Checkout createCheckout(
+      String account,
+      String checkout,
+      String product,
+      BillingPaymentMethod method) {
     LinkedHashMap<String, Object> body = new LinkedHashMap<>();
     body.put("completionUrl", appUrl + "/app?billing=success");
     body.put("returnUrl", appUrl + "/app?billing=return");
     body.put("externalId", checkout);
     body.put("items", List.of(Map.of("id", product, "quantity", 1)));
-    body.put("methods", List.of("PIX_AUTOMATIC".equals(method) ? "PIX" : "CARD"));
+    body.put("methods", List.of(method == BillingPaymentMethod.PIX_AUTOMATIC ? "PIX" : "CARD"));
     body.put("metadata", Map.of("billingAccountId", account, "checkoutId", checkout));
 
     JsonNode data = request("/subscriptions/create", body);

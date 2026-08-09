@@ -1,8 +1,10 @@
 # Arkana API
 
-Spring Boot implementation of the versioned Arkana domain API. Supabase remains
-the identity provider and temporary PostgreSQL host; login and token refresh do
-not belong to this service.
+Current and exclusive Spring Boot implementation of the versioned Arkana domain
+API. Login and token refresh remain outside this service. Supabase Auth is the
+current external OAuth2/JWT issuer, and PostgreSQL may be hosted by Supabase;
+neither detail changes the API's application-owned domain model, persistence,
+or authorization.
 
 ## Code organization
 
@@ -32,6 +34,26 @@ Packages are organized by technical layer, not by endpoint. JPA entities use
 the domain name directly, without an `Entity` suffix. HTTP DTOs use explicit
 `Request` and `Response` suffixes where needed to avoid colliding with domain
 types.
+
+## Data ownership and isolation
+
+Spring Security validates the configured JWT and the API derives the current
+user ID exclusively from its `sub` claim. Controllers pass that trusted UUID to
+application services; every private read and mutation must constrain ownership
+through owner-scoped JPA queries such as `findByIdAndOwnerId` or an equivalent
+specification. Requests never accept an `ownerId` or `userId` selector.
+
+The datasource uses one technical database identity for application traffic.
+PostgreSQL therefore does not know which HTTP user initiated a query, and
+Arkana does not use Row Level Security to authorize API requests. RLS policies,
+the Supabase Data API, PostgREST, RPCs, and Edge Functions are not persistence
+or authorization mechanisms for this service.
+
+Integration tests for owned resources use JUnit and MockMvc. The standard
+isolation scenario persists two users and one resource for each, authenticates
+as the first user, and proves that list endpoints return only that user's rows
+and that direct reads or mutations of the second user's IDs fail without
+changing their data.
 
 ## Local verification
 
@@ -97,8 +119,8 @@ username and password `arkana`. QA and production receive datasource values
 from `ARKANA_DATABASE_*`.
 
 Liquibase uses the same datasource credentials as the application. There is no
-second migration user or application-specific PostgreSQL role. For the current
-Supabase Auth configuration, set `OAUTH2_AUDIENCE=authenticated` in Coolify.
+second migration user or per-request PostgreSQL role. For the current Supabase
+Auth configuration, set `OAUTH2_AUDIENCE=authenticated` in Coolify.
 
 ## Database migrations
 
@@ -106,7 +128,7 @@ Liquibase owns the domain schema through
 `src/main/resources/db/changelog/db.changelog-master.yaml`. Portable relational
 changes and deterministic catalog data run unchanged on H2 and PostgreSQL.
 Profile creation and every domain behavior remain in Java; the Arkana schema
-does not depend on Supabase database schemas and does not define custom
+does not depend on provider-managed database schemas and does not define custom
 functions, procedures, or triggers.
 
 PostgreSQL array columns are represented as arrays in Liquibase and as typed
@@ -115,7 +137,7 @@ Java collections in JPA. In particular, `available_payment_methods` is a
 SQL array constructor rather than CSV strings.
 
 All automated backend verification belongs to the Java test suite and runs
-through Gradle. Do not depend on Node scripts from `arkana-supabase` or manual
+through Gradle. Do not depend on scripts from a legacy adapter or on manual
 `psql` scripts. If PostgreSQL-specific integration coverage is added, implement
 it as an isolated JUnit suite rather than as another language or shell workflow.
 

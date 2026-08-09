@@ -1,10 +1,16 @@
 package com.arkana.integration;
 
+import com.arkana.domain.BillingPaymentMethod;
+
 import java.time.OffsetDateTime;
 import java.util.Map;
 
 public interface PaymentProvider {
-  Checkout createCheckout(String accountId, String checkoutId, String productId, String paymentMethod);
+  Checkout createCheckout(
+      String accountId,
+      String checkoutId,
+      String productId,
+      BillingPaymentMethod paymentMethod);
 
   void cancel(String subscriptionId);
 

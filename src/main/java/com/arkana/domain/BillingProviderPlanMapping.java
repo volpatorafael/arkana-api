@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -25,7 +27,8 @@ public class BillingProviderPlanMapping {
   @Column(name = "plan_price_id", nullable = false)
   private UUID planPriceId;
   @Column(nullable = false, length = 32)
-  private String provider;
+  @Enumerated(EnumType.STRING)
+  private BillingProvider provider;
   @Column(name = "provider_product_id", nullable = false, length = 200)
   private String providerProductId;
 

@@ -1,6 +1,7 @@
 package com.arkana.repository;
 
 import com.arkana.domain.BillingPromotionEligibility;
+import com.arkana.domain.BillingPromotionEligibilityStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
@@ -12,10 +13,10 @@ public interface BillingPromotionEligibilityRepository extends JpaRepository<Bil
 
   List<BillingPromotionEligibility> findAllByBillingAccountIdAndStatusIn(
       UUID accountId,
-      Collection<String> statuses);
+      Collection<BillingPromotionEligibilityStatus> statuses);
 
   List<BillingPromotionEligibility> findAllByBillingAccountIdAndCampaignIdInAndStatus(
       UUID accountId,
       Collection<UUID> campaignIds,
-      String status);
+      BillingPromotionEligibilityStatus status);
 }

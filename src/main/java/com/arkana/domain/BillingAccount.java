@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -34,7 +36,8 @@ public class BillingAccount {
   private String trialEmailFingerprint;
 
   @Column(nullable = false, length = 32)
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private BillingAccountStatus status;
 
   @Column(name = "trial_started_at")
   private OffsetDateTime trialStartedAt;
@@ -71,7 +74,7 @@ public class BillingAccount {
   }
 
   public void cancelAtPeriodEnd() {
-    status = "CANCEL_AT_PERIOD_END";
+    status = BillingAccountStatus.CANCEL_AT_PERIOD_END;
     cancelAtPeriodEnd = true;
   }
 
@@ -80,7 +83,7 @@ public class BillingAccount {
   }
 
   public void applyProviderState(
-      String status,
+      BillingAccountStatus status,
       UUID planId,
       OffsetDateTime periodStart,
       OffsetDateTime periodEnd,

@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -28,7 +30,8 @@ public class BillingPromotionEligibility {
   @Column(name = "campaign_id", nullable = false)
   private UUID campaignId;
   @Column(nullable = false, length = 16)
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private BillingPromotionEligibilityStatus status;
   @Column(name = "granted_at", nullable = false)
   private OffsetDateTime grantedAt;
   @Column(name = "first_checkout_ends_at", nullable = false)
@@ -41,12 +44,12 @@ public class BillingPromotionEligibility {
   private OffsetDateTime forfeitedAt;
 
   public void lock(OffsetDateTime lockedAt) {
-    status = "LOCKED";
+    status = BillingPromotionEligibilityStatus.LOCKED;
     this.lockedAt = lockedAt;
   }
 
   public void forfeit(OffsetDateTime forfeitedAt) {
-    status = "FORFEITED";
+    status = BillingPromotionEligibilityStatus.FORFEITED;
     this.forfeitedAt = forfeitedAt;
   }
 

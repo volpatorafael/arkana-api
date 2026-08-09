@@ -1,32 +1,35 @@
 # Arkana API instructions
 
 These instructions apply to every task in `arkana-api`. They refine the Arkana
-workspace instructions for the Spring Boot implementation. Where the workspace
-still describes Spring Boot as a future adapter or `arkana-supabase` as the
-owner of new domain migrations, the transition rules in this file take
-precedence for this project.
+workspace instructions for the current Spring Boot domain API.
 
 ## Service responsibility
 
-`arkana-api` is Arkana's Spring Boot HTTP API and the target implementation of
-the product backend. It owns domain orchestration, authorization, persistence,
-HTTP DTO mapping, application errors, and new domain database migrations.
+`arkana-api` is Arkana's current and exclusive domain backend. It owns domain
+orchestration, authorization, persistence, HTTP DTO mapping, application
+errors, and domain database migrations.
 
 The intended boundary is:
 
 ```text
 arkana-web
-  -> Supabase Auth only for sign-in and session refresh
-  -> Authorization: Bearer <Supabase access token>
+  -> external identity provider for sign-in and session refresh
+  -> Authorization: Bearer <access token>
   -> arkana-api routes under /v1
      -> Arkana application and domain code
-     -> PostgreSQL currently hosted by Supabase
+     -> PostgreSQL
 ```
 
-The web application must never access Arkana domain tables through the
-Supabase Data API. Do not use Supabase Edge Functions or PostgREST as an
-internal persistence layer for this service. Supabase is temporarily the Auth
-provider and PostgreSQL host, not Arkana's domain API.
+Supabase Auth is currently the external token issuer, and PostgreSQL may be
+hosted by Supabase. These are infrastructure facts only. The web application
+must never access Arkana domain tables directly, and this service must not use
+RLS policies, the Supabase Data API, PostgREST, RPCs, or Edge Functions for
+domain persistence or authorization.
+
+Ordinary `arkana-api` work involving entities, JPA, JDBC, Liquibase, ownership,
+authorization, or integration tests does not trigger Supabase-specific skills
+or workflows. Use Supabase-specific guidance only when a request explicitly
+concerns the current Auth/JWKS integration or Supabase hosting infrastructure.
 
 ## Contract-first HTTP API
 
@@ -40,7 +43,7 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Keep JSON DTOs camelCase. Return errors as unextended RFC 9457 Problem
   Details using `application/problem+json`.
 - Never expose JPA entities, database rows, table names, PostgreSQL errors,
-  Hibernate details, or Supabase response envelopes through HTTP.
+  Hibernate details, or infrastructure-specific envelopes through HTTP.
 - Never accept `ownerId`, `userId`, or equivalent ownership fields from a
   client request. Derive the caller identity from the verified JWT `sub`.
 - Preserve backward compatibility unless the contract version is deliberately
@@ -83,23 +86,22 @@ provider and PostgreSQL host, not Arkana's domain API.
 
 ## Authentication and authorization
 
-- Use Spring Security OAuth2 Resource Server to validate Supabase access-token
-  JWTs. Do not implement a custom JWT filter or parse tokens with hand-written
-  code.
+- Use Spring Security OAuth2 Resource Server to validate access-token JWTs. Do
+  not implement a custom JWT filter or parse tokens with hand-written code.
 - Configure issuer, JWKS URI, and expected audience outside source code.
 - Validate signature, `iss`, `exp`, `nbf`, and the expected audience. Treat
-  `sub` as the authenticated Supabase user ID.
-- The JWKS flow requires asymmetric Supabase signing keys. Do not copy or use a
-  Supabase JWT secret for local HS256 verification.
+  `sub` as the authenticated Arkana user ID.
+- The current Supabase Auth integration uses its asymmetric JWKS keys. Do not
+  copy an issuer secret or add local HS256 verification.
 - Keep the API stateless. Do not create application login sessions or duplicate
-  Supabase Auth user credentials.
+  identity-provider credentials.
 - Permit anonymous access only where the OpenAPI contract explicitly marks an
   operation as public. Require authentication by default.
 - Authentication is not authorization. Enforce resource ownership, profile
   approval, billing access, and administrative permissions in application
   use cases and persistence queries.
-- Never authorize from Supabase `user_metadata`. Authorization data belongs in
-  protected Arkana tables or trusted `app_metadata`, with JWT staleness
+- Never authorize from user-editable token metadata. Authorization data belongs
+  in protected Arkana tables or explicitly trusted claims, with JWT staleness
   considered when claims are used.
 - Return the contract's RFC 9457 `ProblemDetail` representation for `401` and
   `403` rather than Spring Security's default HTML or implementation-specific
@@ -109,14 +111,13 @@ provider and PostgreSQL host, not Arkana's domain API.
 ## Database access
 
 - PostgreSQL is the persistence technology. Keep application code portable so
-  the database can move away from Supabase hosting without redesigning the
-  domain or HTTP API.
+  the database can move between hosts without redesigning the domain or HTTP
+  API.
 - Use the datasource credentials configured through the `ARKANA_DATABASE_*`
   environment variables. Liquibase and the application share that datasource
   unless a concrete operational requirement justifies additional database
   users.
-- Never use a Supabase `service_role` key or another HTTP API secret as a JDBC
-  credential.
+- Never use an HTTP API key or identity-provider secret as a JDBC credential.
 - Configure Hibernate schema handling as `ddl-auto: none`. Never use
   `create`, `create-drop`, or `update` outside an explicitly isolated test.
 - Disable Open Session in View. Load the data required by a use case inside its
@@ -128,15 +129,24 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Prefer UUID identifiers and timezone-aware timestamps consistently with the
   existing schema and OpenAPI contract.
 
-## Database authorization
+## Application ownership and isolation
 
-- Every application query and mutation must constrain ownership using the
-  verified JWT subject. Database access never replaces application-level
-  authorization.
+- Every private query and mutation must constrain ownership using the verified
+  JWT `sub`. Use owner-scoped repository methods or specifications; a lookup by
+  resource ID alone is insufficient.
+- The application datasource uses a shared technical database identity. It does
+  not carry the HTTP user's identity, and Arkana does not use Row Level Security
+  to authorize requests.
+- Never accept ownership fields from request bodies or query parameters. Create
+  owned entities with the trusted user ID supplied by the controller.
+- For nested resources, first prove ownership of the aggregate root and also
+  constrain child lookups by their parent and owner where the schema supports
+  it.
+- Cross-owner reads and mutations should normally be indistinguishable from a
+  missing resource according to the OpenAPI contract, preventing resource
+  enumeration.
 - The web client must not receive credentials or grants for domain-table
   access. It calls only the versioned Arkana HTTP API.
-- After the Edge Function cutover, revoke obsolete Data API grants and stop
-  exposing Arkana domain tables through the Data API.
 
 ## Liquibase ownership
 
@@ -158,16 +168,11 @@ provider and PostgreSQL host, not Arkana's domain API.
 - Never edit a changeset that may already have run. Add a new forward-only
   changeset.
 - Never use Hibernate schema generation as a migration mechanism.
-- Never create, alter, or drop objects in Supabase-managed `auth`, `storage`,
-  or `realtime` schemas. Arkana-owned helpers belong in an Arkana-owned,
-  non-exposed schema.
-- Do not add parallel domain migrations to `arkana-supabase` after Liquibase
-  ownership begins.
-- Before enabling Liquibase against an existing environment, convert and verify
-  the historical Supabase domain migrations, reproduce a fresh database from
-  the Liquibase changelog, compare it with the existing schema, and explicitly
-  baseline the existing database. Never let an unverified initial changelog run
-  destructively against existing data.
+- Do not create parallel domain migrations outside `arkana-api`.
+- Before enabling Liquibase against an existing environment, reproduce a fresh
+  database from the changelog, compare it with the existing schema, and
+  explicitly baseline the database. Never let an unverified initial changelog
+  run destructively against existing data.
 - Avoid pinning PostgreSQL extension versions in new migrations unless the
   hosting environment explicitly requires it.
 
@@ -209,13 +214,16 @@ provider and PostgreSQL host, not Arkana's domain API.
 ## Testing and verification
 
 - Every behavior change requires tests at the narrowest useful level.
-- Add contract tests for each implemented endpoint and keep them portable so
-  they can validate the OpenAPI behavior independently of the old Edge Function.
+- Add contract tests for each implemented endpoint and keep them independent
+  from the database host and identity provider.
 - Test authenticated endpoints with valid, expired, malformed, wrong-issuer,
   and wrong-audience JWTs where relevant.
 - Add authorization tests proving one user cannot read or mutate another
   user's resources and that pending, rejected, or blocked profiles cannot use
   approved-only operations.
+- For every owned resource controller, create two users and one resource for
+  each. Verify list filtering, direct lookup rejection, mutation rejection, and
+  unchanged persisted state for the second user's resource.
 - Run Spring/JPA integration tests with H2 in PostgreSQL compatibility mode,
   with Liquibase enabled and Hibernate schema generation disabled. Any separate
   PostgreSQL-specific integration suite must be implemented in Java with JUnit
@@ -248,6 +256,7 @@ provider and PostgreSQL host, not Arkana's domain API.
 7. Run the relevant Gradle checks and review logs for leaked sensitive data.
 
 If a request would bypass the versioned HTTP contract, expose domain tables to
-the browser, duplicate Supabase Auth, use privileged database credentials for
-ordinary traffic, or introduce a second migration source of truth, call out
-the conflict before implementing it.
+the browser, rely on RLS/Data API/PostgREST/Edge Functions, duplicate external
+authentication, use privileged database credentials for ordinary traffic, or
+introduce a second migration source of truth, call out the conflict before
+implementing it.

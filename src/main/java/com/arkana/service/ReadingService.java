@@ -2,7 +2,9 @@ package com.arkana.service;
 
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
+import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.ReadingPosition;
+import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
 import com.arkana.dto.reading.CreateReadingRequest;
@@ -76,7 +78,7 @@ public class ReadingService {
   @Transactional
   public Map<String, Object> create(UUID owner, CreateReadingRequest request, String locale) {
     access.requireAccess(owner);
-    validateDeck(request.deckMode());
+    ReadingDeckMode deckMode = deckMode(request.deckMode());
     requireSpread(request.spreadId());
     requireClient(owner, request.clientId());
 
@@ -86,8 +88,8 @@ public class ReadingService {
         .ownerId(owner)
         .clientId(request.clientId())
         .spreadId(request.spreadId())
-        .deckMode(request.deckMode())
-        .status("IN_PROGRESS")
+        .deckMode(deckMode)
+        .status(ReadingStatus.IN_PROGRESS)
         .title(trim(request.title()))
         .question(trim(request.question()))
         .context(trim(request.context()))
@@ -119,9 +121,7 @@ public class ReadingService {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       throw badRequest("Invalid pagination.");
     }
-    if (status != null) {
-      validateStatus(status);
-    }
+    ReadingStatus readingStatus = status == null ? null : readingStatus(status);
 
     Specification<Reading> specification = (root, query, builder) ->
         builder.equal(root.get("ownerId"), owner);
@@ -132,9 +132,9 @@ public class ReadingService {
       specification = specification.and((root, query, builder) ->
           builder.equal(root.get("clientId"), clientId));
     }
-    if (status != null) {
+    if (readingStatus != null) {
       specification = specification.and((root, query, builder) ->
-          builder.equal(root.get("status"), status));
+          builder.equal(root.get("status"), readingStatus));
     }
     if (from != null) {
       specification = specification.and((root, query, builder) ->
@@ -161,6 +161,7 @@ public class ReadingService {
   public Map<String, Object> update(UUID owner, UUID id, UpdateReadingRequest request, String locale) {
     access.requireAccess(owner);
     Reading reading = requireInProgress(owner, id);
+    ReadingDeckMode deckMode = reading.getDeckMode();
     if (!request.any()) {
       throw badRequest("At least one field must be provided.");
     }
@@ -168,7 +169,7 @@ public class ReadingService {
       if (request.deckMode() == null) {
         throw badRequest("deckMode cannot be null.");
       }
-      validateDeck(request.deckMode());
+      deckMode = deckMode(request.deckMode());
     }
     if (request.clientPresent()) {
       requireClient(owner, request.clientId());
@@ -182,7 +183,7 @@ public class ReadingService {
         request.spreadPresent(),
         request.spreadId(),
         request.deckPresent(),
-        request.deckMode(),
+        deckMode,
         request.titlePresent(),
         trim(request.title()),
         request.questionPresent(),
@@ -353,7 +354,7 @@ public class ReadingService {
     }
     TarotCard card = cards.findById(cardId)
         .orElseThrow(() -> notFound("Card not found."));
-    if ("MAJOR".equals(reading.getDeckMode()) && !"major".equals(card.getSuit())) {
+    if (reading.getDeckMode() == ReadingDeckMode.MAJOR && !"major".equals(card.getSuit())) {
       throw badRequest("Card is not allowed in this deck.");
     }
   }
@@ -365,7 +366,7 @@ public class ReadingService {
 
   private Reading requireInProgress(UUID owner, UUID id) {
     Reading reading = reading(owner, id);
-    if (!"IN_PROGRESS".equals(reading.getStatus())) {
+    if (reading.getStatus() != ReadingStatus.IN_PROGRESS) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Completed readings are immutable.");
     }
     return reading;
@@ -382,14 +383,18 @@ public class ReadingService {
         .orElseThrow(() -> notFound("Spread not found."));
   }
 
-  private void validateDeck(String value) {
-    if (!List.of("FULL", "MAJOR").contains(value)) {
+  private ReadingDeckMode deckMode(String value) {
+    try {
+      return ReadingDeckMode.valueOf(value);
+    } catch (IllegalArgumentException | NullPointerException exception) {
       throw badRequest("Invalid deck mode.");
     }
   }
 
-  private void validateStatus(String value) {
-    if (!List.of("IN_PROGRESS", "COMPLETED").contains(value)) {
+  private ReadingStatus readingStatus(String value) {
+    try {
+      return ReadingStatus.valueOf(value);
+    } catch (IllegalArgumentException | NullPointerException exception) {
       throw badRequest("Invalid reading status.");
     }
   }
@@ -409,8 +414,8 @@ public class ReadingService {
         "id", reading.getId(),
         "clientId", reading.getClientId(),
         "spreadId", reading.getSpreadId(),
-        "deckMode", reading.getDeckMode(),
-        "status", reading.getStatus(),
+        "deckMode", reading.getDeckMode().name(),
+        "status", reading.getStatus().name(),
         "title", reading.getTitle(),
         "question", reading.getQuestion(),
         "context", reading.getContext(),

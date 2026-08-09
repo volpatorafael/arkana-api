@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -30,13 +32,16 @@ public class BillingCheckout {
   @Column(name = "plan_price_id", nullable = false)
   private UUID planPriceId;
   @Column(name = "payment_method", nullable = false, length = 32)
-  private String paymentMethod;
+  @Enumerated(EnumType.STRING)
+  private BillingPaymentMethod paymentMethod;
   @Column(nullable = false, length = 16)
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private BillingCheckoutStatus status;
   @Column(name = "idempotency_key", nullable = false)
   private UUID idempotencyKey;
   @Column(nullable = false, length = 32)
-  private String provider;
+  @Enumerated(EnumType.STRING)
+  private BillingProvider provider;
   @Column(name = "provider_checkout_id", length = 200)
   private String providerCheckoutId;
   @Column(name = "checkout_url", length = 2000)
@@ -52,18 +57,18 @@ public class BillingCheckout {
   }
 
   public void pending(String providerCheckoutId, String checkoutUrl, OffsetDateTime expiresAt) {
-    status = "PENDING";
+    status = BillingCheckoutStatus.PENDING;
     this.providerCheckoutId = providerCheckoutId;
     this.checkoutUrl = checkoutUrl;
     this.expiresAt = expiresAt;
   }
 
   public void fail() {
-    status = "FAILED";
+    status = BillingCheckoutStatus.FAILED;
   }
 
   public void complete() {
-    status = "COMPLETED";
+    status = BillingCheckoutStatus.COMPLETED;
   }
 
 }
