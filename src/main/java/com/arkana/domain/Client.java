@@ -6,9 +6,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -17,7 +19,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "clients")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Client {
   @Id
   private UUID id;
@@ -37,12 +42,6 @@ public class Client {
   private OffsetDateTime createdAt;
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
-
-  public Client(UUID ownerId, String name, String email, String phone, String notes) {
-    this.id = UUID.randomUUID();
-    this.ownerId = ownerId;
-    update(name, email, phone, notes);
-  }
 
   @PrePersist
   void createTimestamps() {
@@ -71,19 +70,4 @@ public class Client {
     archivedAt = null;
   }
 
-  public UUID getOwnerId() {
-    return ownerId;
-  }
-
-  public String getEmail() {
-    return email;
-  }
-
-  public String getNotes() {
-    return notes;
-  }
-
-  public OffsetDateTime getCreatedAt() {
-    return createdAt;
-  }
 }

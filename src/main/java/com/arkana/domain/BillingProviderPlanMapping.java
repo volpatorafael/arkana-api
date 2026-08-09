@@ -4,16 +4,21 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "billing_provider_plan_mappings")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingProviderPlanMapping {
   @Id
   private UUID id;
@@ -24,7 +29,4 @@ public class BillingProviderPlanMapping {
   @Column(name = "provider_product_id", nullable = false, length = 200)
   private String providerProductId;
 
-  public String getProviderProductId() {
-    return providerProductId;
-  }
 }

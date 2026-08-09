@@ -7,9 +7,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -17,7 +19,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "spread_positions")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SpreadPosition {
   @Id
   private UUID id;
@@ -43,23 +48,4 @@ public class SpreadPosition {
   @Column(nullable = false)
   private short rotation;
 
-  public Spread getSpread() {
-    return spread;
-  }
-
-  public short getPositionOrder() {
-    return positionOrder;
-  }
-
-  public String getNameEn() {
-    return nameEn;
-  }
-
-  public String getMeaningEn() {
-    return meaningEn;
-  }
-
-  public BigDecimal getY() {
-    return y;
-  }
 }

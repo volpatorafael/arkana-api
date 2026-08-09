@@ -4,9 +4,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -14,7 +16,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "billing_promotion_eligibilities")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingPromotionEligibility {
   @Id
   private UUID id;
@@ -35,19 +40,6 @@ public class BillingPromotionEligibility {
   @Column(name = "forfeited_at")
   private OffsetDateTime forfeitedAt;
 
-  public BillingPromotionEligibility(
-      UUID billingAccountId,
-      UUID campaignId,
-      OffsetDateTime grantedAt,
-      OffsetDateTime firstCheckoutEndsAt) {
-    id = UUID.randomUUID();
-    this.billingAccountId = billingAccountId;
-    this.campaignId = campaignId;
-    status = "ELIGIBLE";
-    this.grantedAt = grantedAt;
-    this.firstCheckoutEndsAt = firstCheckoutEndsAt;
-  }
-
   public void lock(OffsetDateTime lockedAt) {
     status = "LOCKED";
     this.lockedAt = lockedAt;
@@ -58,11 +50,4 @@ public class BillingPromotionEligibility {
     this.forfeitedAt = forfeitedAt;
   }
 
-  public String getStatus() {
-    return status;
-  }
-
-  public OffsetDateTime getFirstCheckoutEndsAt() {
-    return firstCheckoutEndsAt;
-  }
 }

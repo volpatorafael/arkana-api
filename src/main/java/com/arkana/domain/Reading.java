@@ -4,9 +4,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -14,7 +16,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "readings")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Reading {
   @Id
   private UUID id;
@@ -44,29 +49,6 @@ public class Reading {
   private OffsetDateTime createdAt;
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
-
-  public Reading(
-      UUID ownerId,
-      UUID clientId,
-      String spreadId,
-      String deckMode,
-      String title,
-      String question,
-      String context,
-      OffsetDateTime createdAt) {
-    id = UUID.randomUUID();
-    this.ownerId = ownerId;
-    this.clientId = clientId;
-    this.spreadId = spreadId;
-    this.deckMode = deckMode;
-    status = "IN_PROGRESS";
-    this.title = title;
-    this.question = question;
-    this.context = context;
-    startedAt = createdAt;
-    this.createdAt = createdAt;
-    updatedAt = createdAt;
-  }
 
   public void update(
       boolean clientPresent,
@@ -119,27 +101,4 @@ public class Reading {
     this.updatedAt = updatedAt;
   }
 
-  public UUID getClientId() {
-    return clientId;
-  }
-
-  public String getDeckMode() {
-    return deckMode;
-  }
-
-  public String getTitle() {
-    return title;
-  }
-
-  public String getContext() {
-    return context;
-  }
-
-  public OffsetDateTime getCompletedAt() {
-    return completedAt;
-  }
-
-  public OffsetDateTime getCreatedAt() {
-    return createdAt;
-  }
 }

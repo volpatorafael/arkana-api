@@ -4,9 +4,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -14,7 +16,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "reading_comments")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ReadingComment {
   @Id
   private UUID id;
@@ -29,25 +34,9 @@ public class ReadingComment {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
-  public ReadingComment(UUID ownerId, UUID readingId, String body, OffsetDateTime createdAt) {
-    id = UUID.randomUUID();
-    this.ownerId = ownerId;
-    this.readingId = readingId;
-    this.body = body;
-    this.createdAt = createdAt;
-    updatedAt = createdAt;
-  }
-
   public void update(String body, OffsetDateTime updatedAt) {
     this.body = body;
     this.updatedAt = updatedAt;
   }
 
-  public UUID getReadingId() {
-    return readingId;
-  }
-
-  public OffsetDateTime getCreatedAt() {
-    return createdAt;
-  }
 }

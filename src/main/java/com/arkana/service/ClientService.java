@@ -44,8 +44,15 @@ public class ClientService {
   @Transactional
   public ClientResponse create(UUID userId, SaveClientRequest request) {
     access.requireAccess(userId);
-    return mapper.toResponse(repository.save(new Client(userId, normalizedName(request.name()),
-        nullable(request.email()), nullable(request.phone()), nullable(request.notes()))));
+    Client client = Client.builder()
+        .id(UUID.randomUUID())
+        .ownerId(userId)
+        .name(normalizedName(request.name()))
+        .email(nullable(request.email()))
+        .phone(nullable(request.phone()))
+        .notes(nullable(request.notes()))
+        .build();
+    return mapper.toResponse(repository.save(client));
   }
 
   @Transactional(readOnly = true)

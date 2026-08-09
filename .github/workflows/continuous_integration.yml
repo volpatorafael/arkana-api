@@ -1,6 +1,9 @@
-name: Main - PR Check
+name: Main - CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -32,6 +35,9 @@ jobs:
 
       - name: Run checks
         run: ./gradlew check --no-daemon
+
+      - name: Build Docker image
+        run: docker build --tag arkana-api:ci .
 
       - name: Publish Test Results
         uses: dorny/test-reporter@v2

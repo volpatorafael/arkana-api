@@ -95,18 +95,24 @@ public class BillingService {
     }
 
     OffsetDateTime startedAt = now();
-    BillingAccount account = accounts.save(new BillingAccount(
-        ownerId,
-        emailFingerprint,
-        startedAt,
-        startedAt.plusDays(14)));
+    BillingAccount account = accounts.save(BillingAccount.builder()
+        .id(UUID.randomUUID())
+        .ownerId(ownerId)
+        .trialEmailFingerprint(emailFingerprint)
+        .status("TRIALING")
+        .trialStartedAt(startedAt)
+        .trialEndsAt(startedAt.plusDays(14))
+        .build());
     List<BillingPromotionCampaign> activeCampaigns = activeCampaigns(startedAt);
     List<BillingPromotionEligibility> granted = activeCampaigns.stream()
-        .map(campaign -> new BillingPromotionEligibility(
-            account.getId(),
-            campaign.getId(),
-            startedAt,
-            startedAt.plusDays(14).plusHours(48)))
+        .map(campaign -> BillingPromotionEligibility.builder()
+            .id(UUID.randomUUID())
+            .billingAccountId(account.getId())
+            .campaignId(campaign.getId())
+            .status("ELIGIBLE")
+            .grantedAt(startedAt)
+            .firstCheckoutEndsAt(startedAt.plusDays(14).plusHours(48))
+            .build())
         .toList();
     eligibilities.saveAll(granted);
     return overview(ownerId);
@@ -183,15 +189,16 @@ public class BillingService {
             "The plan is not configured or is not eligible at the payment provider."));
 
     UUID checkoutId = UUID.randomUUID();
-    BillingCheckout checkout = checkouts.saveAndFlush(new BillingCheckout(
-        checkoutId,
-        account.getId(),
-        selectedPlan.getId(),
-        request.paymentMethod(),
-        "CREATING",
-        key,
-        PAYMENT_PROVIDER,
-        currentTime.plusMinutes(30)));
+    BillingCheckout checkout = checkouts.saveAndFlush(BillingCheckout.builder()
+        .id(checkoutId)
+        .billingAccountId(account.getId())
+        .planPriceId(selectedPlan.getId())
+        .paymentMethod(request.paymentMethod())
+        .status("CREATING")
+        .idempotencyKey(key)
+        .provider(PAYMENT_PROVIDER)
+        .expiresAt(currentTime.plusMinutes(30))
+        .build());
     try {
       PaymentProvider.Checkout providerCheckout = provider.createCheckout(
           account.getId().toString(),
@@ -242,11 +249,14 @@ public class BillingService {
       return;
     }
 
-    BillingProviderEvent providerEvent = providerEvents.save(new BillingProviderEvent(
-        PAYMENT_PROVIDER,
-        eventId,
-        (String) event.get("event"),
-        String.valueOf(event.get("payload"))));
+    BillingProviderEvent providerEvent = providerEvents.save(BillingProviderEvent.builder()
+        .id(UUID.randomUUID())
+        .provider(PAYMENT_PROVIDER)
+        .providerEventId(eventId)
+        .eventType((String) event.get("event"))
+        .processingStatus("RECEIVED")
+        .rawPayload(String.valueOf(event.get("payload")))
+        .build());
     WebhookContext context = webhookContext(
         (String) event.get("checkoutId"),
         (String) event.get("subscriptionId"));
@@ -306,10 +316,12 @@ public class BillingService {
     }
     BillingProviderSubscription subscription = subscriptions
         .findByBillingAccountIdAndProvider(accountId, PAYMENT_PROVIDER)
-        .orElseGet(() -> new BillingProviderSubscription(
-            accountId,
-            PAYMENT_PROVIDER,
-            subscriptionId));
+        .orElseGet(() -> BillingProviderSubscription.builder()
+            .id(UUID.randomUUID())
+            .billingAccountId(accountId)
+            .provider(PAYMENT_PROVIDER)
+            .providerSubscriptionId(subscriptionId)
+            .build());
     subscription.updateSubscriptionId(subscriptionId);
     subscriptions.save(subscription);
   }

@@ -4,16 +4,21 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
 @Entity
 @Table(name = "billing_provider_subscriptions")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingProviderSubscription {
   @Id
   private UUID id;
@@ -24,18 +29,8 @@ public class BillingProviderSubscription {
   @Column(name = "provider_subscription_id", nullable = false, length = 200)
   private String providerSubscriptionId;
 
-  public BillingProviderSubscription(UUID billingAccountId, String provider, String subscriptionId) {
-    id = UUID.randomUUID();
-    this.billingAccountId = billingAccountId;
-    this.provider = provider;
-    this.providerSubscriptionId = subscriptionId;
-  }
-
   public void updateSubscriptionId(String subscriptionId) {
     providerSubscriptionId = subscriptionId;
   }
 
-  public String getProviderSubscriptionId() {
-    return providerSubscriptionId;
-  }
 }

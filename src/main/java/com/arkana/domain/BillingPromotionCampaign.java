@@ -5,9 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -16,7 +18,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "billing_promotion_campaigns")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingPromotionCampaign {
   @Id
   private UUID id;
@@ -35,32 +40,9 @@ public class BillingPromotionCampaign {
   @Column(name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
 
-  public BillingPromotionCampaign(
-      UUID id,
-      String code,
-      String name,
-      String status,
-      OffsetDateTime startsAt,
-      OffsetDateTime endsAt) {
-    this.id = id;
-    this.code = code;
-    this.name = name;
-    this.status = status;
-    this.startsAt = startsAt;
-    this.endsAt = endsAt;
-    this.retentionPolicy = "WHILE_SUBSCRIPTION_ACTIVE";
-  }
-
   @PrePersist
   void createTimestamp() {
     createdAt = OffsetDateTime.now(ZoneOffset.UTC);
   }
 
-  public String getCode() {
-    return code;
-  }
-
-  public OffsetDateTime getEndsAt() {
-    return endsAt;
-  }
 }

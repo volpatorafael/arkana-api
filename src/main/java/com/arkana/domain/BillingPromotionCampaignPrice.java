@@ -5,9 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
@@ -15,7 +17,10 @@ import java.util.UUID;
 @IdClass(BillingPromotionCampaignPriceId.class)
 @Table(name = "billing_promotion_campaign_prices")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingPromotionCampaignPrice {
   @Id
   @Column(name = "campaign_id", nullable = false)
@@ -28,18 +33,4 @@ public class BillingPromotionCampaignPrice {
   @Column(name = "compare_at_plan_price_id", nullable = false)
   private UUID compareAtPlanPriceId;
 
-  public BillingPromotionCampaignPrice(
-      UUID campaignId,
-      String billingInterval,
-      UUID promotionalPlanPriceId,
-      UUID compareAtPlanPriceId) {
-    this.campaignId = campaignId;
-    this.billingInterval = billingInterval;
-    this.promotionalPlanPriceId = promotionalPlanPriceId;
-    this.compareAtPlanPriceId = compareAtPlanPriceId;
-  }
-
-  public UUID getPromotionalPlanPriceId() {
-    return promotionalPlanPriceId;
-  }
 }

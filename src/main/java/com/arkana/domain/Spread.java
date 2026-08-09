@@ -6,9 +6,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +18,10 @@ import java.util.List;
 @Entity
 @Table(name = "spreads")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Spread {
   @OneToMany(mappedBy = "spread")
   @OrderBy("positionOrder ASC")
@@ -46,27 +51,4 @@ public class Spread {
   @Column(nullable = false)
   private boolean active;
 
-  public short getDisplayOrder() {
-    return displayOrder;
-  }
-
-  public String getNameEn() {
-    return nameEn;
-  }
-
-  public String getShortDescriptionEn() {
-    return shortDescriptionEn;
-  }
-
-  public String getDescriptionEn() {
-    return descriptionEn;
-  }
-
-  public String getUseCaseEn() {
-    return useCaseEn;
-  }
-
-  public boolean isActive() {
-    return active;
-  }
 }

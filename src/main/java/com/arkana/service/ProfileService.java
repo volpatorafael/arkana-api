@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -48,7 +50,16 @@ public class ProfileService {
 
   private Profile findOrCreate(UUID userId, String email) {
     return repository.findById(userId)
-        .orElseGet(() -> repository.save(new Profile(userId, email, "pt-BR")));
+        .orElseGet(() -> {
+          OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+          return repository.save(Profile.builder()
+              .id(userId)
+              .email(email)
+              .locale("pt-BR")
+              .createdAt(now)
+              .updatedAt(now)
+              .build());
+        });
   }
 
   private String normalized(String value, String field) {

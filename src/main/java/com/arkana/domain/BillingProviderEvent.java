@@ -5,9 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -16,7 +18,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "billing_provider_events")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingProviderEvent {
   @Id
   private UUID id;
@@ -32,15 +37,6 @@ public class BillingProviderEvent {
   private String rawPayload;
   @Column(name = "received_at", nullable = false, updatable = false)
   private OffsetDateTime receivedAt;
-
-  public BillingProviderEvent(String provider, String providerEventId, String eventType, String rawPayload) {
-    id = UUID.randomUUID();
-    this.provider = provider;
-    this.providerEventId = providerEventId;
-    this.eventType = eventType;
-    processingStatus = "RECEIVED";
-    this.rawPayload = rawPayload;
-  }
 
   @PrePersist
   void createTimestamp() {

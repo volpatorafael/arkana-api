@@ -97,8 +97,8 @@ class ApiMigrationIntegrationTest {
 
   @BeforeEach
   void setUpProfiles() {
-    profiles.save(new Profile(USER_ONE, "one@arkana.test", "pt-BR"));
-    profiles.save(new Profile(USER_TWO, "two@arkana.test", "en"));
+    profiles.save(profile(USER_ONE, "one@arkana.test", "pt-BR"));
+    profiles.save(profile(USER_TWO, "two@arkana.test", "en"));
     profiles.flush();
     billing.startTrial(USER_ONE);
     billing.startTrial(USER_TWO);
@@ -181,7 +181,7 @@ class ApiMigrationIntegrationTest {
     mvc.perform(get("/v1/public/plans"))
         .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(2)))
         .andExpect(jsonPath("$[0].promotion.code").value("FOUNDERS"));
-    profiles.save(new Profile(USER_THREE, "three@arkana.test", "pt-BR"));
+    profiles.save(profile(USER_THREE, "three@arkana.test", "pt-BR"));
     profiles.flush();
     mvc.perform(get("/v1/cards").with(user(USER_THREE)))
         .andExpect(status().isForbidden())
@@ -194,7 +194,7 @@ class ApiMigrationIntegrationTest {
     mvc.perform(get("/v1/cards?deckMode=MAJOR").with(user(USER_THREE)))
         .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(22)));
 
-    profiles.save(new Profile(USER_FOUR, "one@arkana.test", "pt-BR"));
+    profiles.save(profile(USER_FOUR, "one@arkana.test", "pt-BR"));
     profiles.flush();
     mvc.perform(post("/v1/billing/trial").with(user(USER_FOUR)))
         .andExpect(status().isConflict())
@@ -229,15 +229,16 @@ class ApiMigrationIntegrationTest {
     BillingAccount account = billingAccounts.findByOwnerId(USER_ONE).orElseThrow();
     UUID checkout = UUID.fromString("50000000-0000-0000-0000-000000000001");
     OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-    billingCheckouts.save(new BillingCheckout(
-        checkout,
-        account.getId(),
-        UUID.fromString("30000000-0000-0000-0000-000000000001"),
-        "PIX_AUTOMATIC",
-        "PENDING",
-        UUID.randomUUID(),
-        "ABACATEPAY",
-        now.plusMinutes(30)));
+    billingCheckouts.save(BillingCheckout.builder()
+        .id(checkout)
+        .billingAccountId(account.getId())
+        .planPriceId(UUID.fromString("30000000-0000-0000-0000-000000000001"))
+        .paymentMethod("PIX_AUTOMATIC")
+        .status("PENDING")
+        .idempotencyKey(UUID.randomUUID())
+        .provider("ABACATEPAY")
+        .expiresAt(now.plusMinutes(30))
+        .build());
     String payload = "{\"id\":\"evt-1\",\"event\":\"subscription.completed\",\"data\":{\"subscription\":{\"id\":\"sub-1\",\"currentPeriodStart\":\"" + now + "\",\"currentPeriodEnd\":\"" + now.plusMonths(
         1) + "\"},\"checkout\":{\"externalId\":\"" + checkout + "\"}}}";
     String signature = hmac(payload, "test-hmac-key");
@@ -341,37 +342,41 @@ class ApiMigrationIntegrationTest {
     UUID campaign = UUID.fromString("40000000-0000-0000-0000-000000000001");
     UUID monthly = UUID.fromString("40000000-0000-0000-0000-000000000002");
     UUID yearly = UUID.fromString("40000000-0000-0000-0000-000000000003");
-    billingPlanPrices.save(new BillingPlanPrice(
-        monthly,
-        "FOUNDER_MONTH",
-        "Founder mensal",
-        "MONTH",
-        2900,
-        4900,
-        "BRL",
-        14,
-        List.of("PIX_AUTOMATIC", "CARD"),
-        true,
-        false));
-    billingPlanPrices.save(new BillingPlanPrice(
-        yearly,
-        "FOUNDER_YEAR",
-        "Founder anual",
-        "YEAR",
-        29000,
-        49000,
-        "BRL",
-        14,
-        List.of("PIX_AUTOMATIC", "CARD"),
-        true,
-        false));
-    billingPromotionCampaigns.save(new BillingPromotionCampaign(
-        campaign,
-        "FOUNDERS",
-        "Fundadores",
-        "ACTIVE",
-        now.minusDays(1),
-        now.plusDays(29)));
+    billingPlanPrices.save(BillingPlanPrice.builder()
+        .id(monthly)
+        .code("FOUNDER_MONTH")
+        .name("Founder mensal")
+        .billingInterval("MONTH")
+        .amount(2900)
+        .compareAtAmount(4900)
+        .currency("BRL")
+        .trialDays(14)
+        .availablePaymentMethods(List.of("PIX_AUTOMATIC", "CARD"))
+        .active(true)
+        .defaultPlan(false)
+        .build());
+    billingPlanPrices.save(BillingPlanPrice.builder()
+        .id(yearly)
+        .code("FOUNDER_YEAR")
+        .name("Founder anual")
+        .billingInterval("YEAR")
+        .amount(29000)
+        .compareAtAmount(49000)
+        .currency("BRL")
+        .trialDays(14)
+        .availablePaymentMethods(List.of("PIX_AUTOMATIC", "CARD"))
+        .active(true)
+        .defaultPlan(false)
+        .build());
+    billingPromotionCampaigns.save(BillingPromotionCampaign.builder()
+        .id(campaign)
+        .code("FOUNDERS")
+        .name("Fundadores")
+        .status("ACTIVE")
+        .startsAt(now.minusDays(1))
+        .endsAt(now.plusDays(29))
+        .retentionPolicy("WHILE_SUBSCRIPTION_ACTIVE")
+        .build());
     billingPromotionCampaignPrices.save(new BillingPromotionCampaignPrice(
         campaign,
         "MONTH",
@@ -382,5 +387,16 @@ class ApiMigrationIntegrationTest {
         "YEAR",
         yearly,
         UUID.fromString("30000000-0000-0000-0000-000000000002")));
+  }
+
+  private Profile profile(UUID id, String email, String locale) {
+    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    return Profile.builder()
+        .id(id)
+        .email(email)
+        .locale(locale)
+        .createdAt(now)
+        .updatedAt(now)
+        .build();
   }
 }

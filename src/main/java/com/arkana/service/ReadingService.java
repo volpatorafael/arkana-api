@@ -81,15 +81,20 @@ public class ReadingService {
     requireClient(owner, request.clientId());
 
     OffsetDateTime createdAt = now();
-    Reading reading = readings.save(new Reading(
-        owner,
-        request.clientId(),
-        request.spreadId(),
-        request.deckMode(),
-        trim(request.title()),
-        trim(request.question()),
-        trim(request.context()),
-        createdAt));
+    Reading reading = readings.save(Reading.builder()
+        .id(UUID.randomUUID())
+        .ownerId(owner)
+        .clientId(request.clientId())
+        .spreadId(request.spreadId())
+        .deckMode(request.deckMode())
+        .status("IN_PROGRESS")
+        .title(trim(request.title()))
+        .question(trim(request.question()))
+        .context(trim(request.context()))
+        .startedAt(createdAt)
+        .createdAt(createdAt)
+        .updatedAt(createdAt)
+        .build());
     copySpreadPositions(reading.getId(), request.spreadId(), createdAt);
     return response(reading, locale);
   }
@@ -273,11 +278,15 @@ public class ReadingService {
   public Map<String, Object> addComment(UUID owner, UUID readingId, SaveReadingCommentRequest request) {
     access.requireAccess(owner);
     reading(owner, readingId);
-    ReadingComment comment = comments.save(new ReadingComment(
-        owner,
-        readingId,
-        request.body().trim(),
-        now()));
+    OffsetDateTime createdAt = now();
+    ReadingComment comment = comments.save(ReadingComment.builder()
+        .id(UUID.randomUUID())
+        .ownerId(owner)
+        .readingId(readingId)
+        .body(request.body().trim())
+        .createdAt(createdAt)
+        .updatedAt(createdAt)
+        .build());
     return comment(comment);
   }
 
@@ -318,7 +327,22 @@ public class ReadingService {
     List<ReadingPosition> copies = spreadPositions
         .findAllBySpread_IdOrderByPositionOrderAsc(spreadId)
         .stream()
-        .map(position -> new ReadingPosition(readingId, position, createdAt))
+        .map(position -> ReadingPosition.builder()
+            .id(UUID.randomUUID())
+            .readingId(readingId)
+            .spreadPositionId(position.getId())
+            .positionKey(position.getPositionKey())
+            .positionOrder(position.getPositionOrder())
+            .namePtBr(position.getNamePtBr())
+            .nameEn(position.getNameEn())
+            .meaningPtBr(position.getMeaningPtBr())
+            .meaningEn(position.getMeaningEn())
+            .x(position.getX())
+            .y(position.getY())
+            .rotation(position.getRotation())
+            .createdAt(createdAt)
+            .updatedAt(createdAt)
+            .build())
         .toList();
     positions.saveAll(copies);
   }

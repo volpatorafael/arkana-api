@@ -5,10 +5,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -20,8 +21,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "billing_plan_prices")
 @Getter
+@Setter
 @Builder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
+@AllArgsConstructor
 public class BillingPlanPrice {
   @Id
   private UUID id;
@@ -48,31 +51,6 @@ public class BillingPlanPrice {
   private boolean defaultPlan;
   @Column(name = "created_at", nullable = false, updatable = false)
   private OffsetDateTime createdAt;
-
-  public BillingPlanPrice(
-      UUID id,
-      String code,
-      String name,
-      String billingInterval,
-      int amount,
-      Integer compareAtAmount,
-      String currency,
-      int trialDays,
-      List<String> availablePaymentMethods,
-      boolean active,
-      boolean defaultPlan) {
-    this.id = id;
-    this.code = code;
-    this.name = name;
-    this.billingInterval = billingInterval;
-    this.amount = amount;
-    this.compareAtAmount = compareAtAmount;
-    this.currency = currency;
-    this.trialDays = trialDays;
-    this.availablePaymentMethods = availablePaymentMethods;
-    this.active = active;
-    this.defaultPlan = defaultPlan;
-  }
 
   @PrePersist
   void createTimestamp() {

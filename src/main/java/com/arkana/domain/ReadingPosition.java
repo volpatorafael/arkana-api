@@ -4,9 +4,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -15,7 +17,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "reading_positions")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ReadingPosition {
   @Id
   private UUID id;
@@ -52,23 +57,6 @@ public class ReadingPosition {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
-  public ReadingPosition(UUID readingId, SpreadPosition position, OffsetDateTime createdAt) {
-    id = UUID.randomUUID();
-    this.readingId = readingId;
-    spreadPositionId = position.getId();
-    positionKey = position.getPositionKey();
-    positionOrder = position.getPositionOrder();
-    namePtBr = position.getNamePtBr();
-    nameEn = position.getNameEn();
-    meaningPtBr = position.getMeaningPtBr();
-    meaningEn = position.getMeaningEn();
-    x = position.getX();
-    y = position.getY();
-    rotation = position.getRotation();
-    this.createdAt = createdAt;
-    updatedAt = createdAt;
-  }
-
   public void update(String cardId, String orientation, String interpretation, OffsetDateTime updatedAt) {
     this.cardId = cardId;
     this.orientation = orientation;
@@ -76,31 +64,4 @@ public class ReadingPosition {
     this.updatedAt = updatedAt;
   }
 
-  public String getPositionKey() {
-    return positionKey;
-  }
-
-  public String getNamePtBr() {
-    return namePtBr;
-  }
-
-  public String getMeaningPtBr() {
-    return meaningPtBr;
-  }
-
-  public BigDecimal getX() {
-    return x;
-  }
-
-  public short getRotation() {
-    return rotation;
-  }
-
-  public String getOrientation() {
-    return orientation;
-  }
-
-  public OffsetDateTime getCreatedAt() {
-    return createdAt;
-  }
 }
