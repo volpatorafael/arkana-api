@@ -17,13 +17,11 @@ com.arkana
 │   ├── catalog
 │   ├── client
 │   ├── profile
-│   ├── reading
-│   └── waitlist
+│   └── reading
 ├── domain            JPA entities and persistent enums
 ├── repository        Spring Data repositories
 ├── integration       external-service ports
-│   ├── abacatepay    AbacatePay adapter
-│   └── resend        Resend adapter
+│   └── abacatepay    AbacatePay adapter
 ├── exception         RFC 9457 exception translation
 ├── config
 ├── security
@@ -86,7 +84,6 @@ Optional or environment-specific variables:
 
 ```text
 ARKANA_ALLOWED_ORIGINS
-ARKANA_APP_URL
 RESEND_API_KEY
 RESEND_FROM
 ABACATEPAY_API_KEY

@@ -1,0 +1,41 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+tab_width = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 140
+ij_continuation_indent_size = 4
+ij_formatter_off_tag = @formatter:off
+ij_formatter_on_tag = @formatter:on
+ij_formatter_tags_enabled = true
+
+[*.java]
+ij_java_continuation_indent_size = 4
+ij_java_keep_line_breaks = true
+ij_java_call_parameters_new_line_after_left_paren = false
+ij_java_call_parameters_right_paren_on_new_line = false
+ij_java_call_parameters_wrap = normal
+ij_java_method_parameters_new_line_after_left_paren = false
+ij_java_method_parameters_right_paren_on_new_line = false
+ij_java_method_parameters_wrap = off
+ij_java_switch_expressions_wrap = off
+ij_java_keep_simple_methods_in_one_line = false
+ij_java_keep_simple_blocks_in_one_line = false
+ij_java_blank_lines_around_method = 1
+ij_java_blank_lines_around_class = 1
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+ij_java_use_single_class_imports = true
+
+[{*.kt,*.kts}]
+indent_size = 4
+tab_width = 4
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off

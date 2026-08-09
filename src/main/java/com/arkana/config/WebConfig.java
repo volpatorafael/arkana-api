@@ -8,13 +8,13 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class WebConfig {
-    @Bean
-    FilterRegistrationBean<RequestLoggingFilter> requestLoggingFilter() {
-        FilterRegistrationBean<RequestLoggingFilter> registration = new FilterRegistrationBean<>();
-        registration.setFilter(new RequestLoggingFilter());
-        registration.addUrlPatterns("/*");
-        registration.setOrder(-99);
-        registration.setName("arkanaRequestLoggingFilter");
-        return registration;
-    }
+  @Bean
+  FilterRegistrationBean<RequestLoggingFilter> requestLoggingFilter() {
+    FilterRegistrationBean<RequestLoggingFilter> registration = new FilterRegistrationBean<>();
+    registration.setFilter(new RequestLoggingFilter());
+    registration.addUrlPatterns("/*");
+    registration.setOrder(-99);
+    registration.setName("arkanaRequestLoggingFilter");
+    return registration;
+  }
 }

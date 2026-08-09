@@ -28,7 +28,6 @@ arkana:
   abacatepay:
     webhook-secret: test-webhook-secret
     webhook-hmac-key: test-hmac-key
-  reconciliation-secret: test-reconciliation-secret
 
 logging:
   level:

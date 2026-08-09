@@ -10,24 +10,24 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ArkanaMetricsService {
-    private final MeterRegistry meterRegistry;
+  private final MeterRegistry meterRegistry;
 
-    public Timer.Sample startTimer() {
-        return Timer.start(meterRegistry);
-    }
+  public Timer.Sample startTimer() {
+    return Timer.start(meterRegistry);
+  }
 
-    public void stopTimer(Timer.Sample sample, ArkanaMetric metric, String... tags) {
-        sample.stop(Timer.builder(metric.metricName())
-                .description(metric.getDescription())
-                .tags(tags)
-                .register(meterRegistry));
-    }
+  public void stopTimer(Timer.Sample sample, ArkanaMetric metric, String... tags) {
+    sample.stop(Timer.builder(metric.metricName())
+        .description(metric.getDescription())
+        .tags(tags)
+        .register(meterRegistry));
+  }
 
-    public void incrementCounter(ArkanaMetric metric, String... tags) {
-        Counter.builder(metric.metricName())
-                .description(metric.getDescription())
-                .tags(tags)
-                .register(meterRegistry)
-                .increment();
-    }
+  public void incrementCounter(ArkanaMetric metric, String... tags) {
+    Counter.builder(metric.metricName())
+        .description(metric.getDescription())
+        .tags(tags)
+        .register(meterRegistry)
+        .increment();
+  }
 }

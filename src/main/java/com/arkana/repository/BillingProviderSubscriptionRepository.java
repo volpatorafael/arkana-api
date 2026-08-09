@@ -1,0 +1,15 @@
+package com.arkana.repository;
+
+import com.arkana.domain.BillingProviderSubscription;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface BillingProviderSubscriptionRepository extends JpaRepository<BillingProviderSubscription, UUID> {
+  Optional<BillingProviderSubscription> findByBillingAccountIdAndProvider(UUID accountId, String provider);
+
+  Optional<BillingProviderSubscription> findByProviderAndProviderSubscriptionId(
+      String provider,
+      String subscriptionId);
+}

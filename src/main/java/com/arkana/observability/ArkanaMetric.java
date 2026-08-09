@@ -8,12 +8,12 @@ import java.util.Locale;
 @Getter
 @RequiredArgsConstructor
 public enum ArkanaMetric {
-    REPOSITORY_QUERY_COUNT("Total repository query invocations"),
-    REPOSITORY_QUERY_DURATION("Repository query duration");
+  REPOSITORY_QUERY_COUNT("Total repository query invocations"),
+  REPOSITORY_QUERY_DURATION("Repository query duration");
 
-    private final String description;
+  private final String description;
 
-    public String metricName() {
-        return "arkana_" + name().toLowerCase(Locale.ROOT);
-    }
+  public String metricName() {
+    return "arkana_" + name().toLowerCase(Locale.ROOT);
+  }
 }

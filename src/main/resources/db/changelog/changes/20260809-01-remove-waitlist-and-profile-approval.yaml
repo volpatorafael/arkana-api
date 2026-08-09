@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260809-01-remove-waitlist-and-profile-approval
+      author: arkana
+      changes:
+        - dropTable:
+            tableName: waitlist_entries
+        - sql:
+            sql: alter table profiles drop constraint if exists profiles_status_check
+        - dropColumn:
+            tableName: profiles
+            columnName: approved_by
+        - dropColumn:
+            tableName: profiles
+            columnName: approved_at
+        - dropColumn:
+            tableName: profiles
+            columnName: status
