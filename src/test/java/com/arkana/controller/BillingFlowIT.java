@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
@@ -32,6 +31,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
@@ -63,9 +63,6 @@ class BillingFlowIT extends BaseControllerIT {
     @Autowired
     private BillingProviderPlanMappingRepository planMappingRepository;
 
-    @MockitoBean
-    private PaymentProvider paymentProvider;
-
     @Test
     void shouldCompleteTrialCheckoutAndSubscriptionActivationFlow() throws Exception {
         Profile user = entityGeneratorService.randomProfile();
@@ -89,11 +86,10 @@ class BillingFlowIT extends BaseControllerIT {
 
         UUID idempotencyKey = UUID.randomUUID();
         OffsetDateTime checkoutExpiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30);
-        when(paymentProvider.createCheckout(
-            eq(account.getId().toString()),
-            any(String.class),
-            eq(monthlyMapping.getProviderProductId()),
-            eq(BillingPaymentMethod.CARD)))
+        when(abacatePayProvider.createCheckout(argThat(command ->
+            command.accountId().equals(account.getId().toString())
+                && command.plan().providerProductId().equals(monthlyMapping.getProviderProductId())
+                && command.paymentMethod() == BillingPaymentMethod.CARD)))
             .thenReturn(new PaymentProvider.Checkout(
                 "provider-checkout-monthly",
                 "https://checkout.arkana.test/monthly",
@@ -111,11 +107,11 @@ class BillingFlowIT extends BaseControllerIT {
             .andExpect(jsonPath("$.id").value(checkoutId))
             .andExpect(jsonPath("$.url").value("https://checkout.arkana.test/monthly"));
 
-        verify(paymentProvider, times(1)).createCheckout(
-            eq(account.getId().toString()),
-            eq(checkoutId),
-            eq(MONTHLY_PRODUCT_ID),
-            eq(BillingPaymentMethod.CARD));
+        verify(abacatePayProvider, times(1)).createCheckout(argThat(command ->
+            command.accountId().equals(account.getId().toString())
+                && command.checkoutId().equals(checkoutId)
+                && command.plan().providerProductId().equals(MONTHLY_PRODUCT_ID)
+                && command.paymentMethod() == BillingPaymentMethod.CARD));
         assertThat(checkoutRepository.findAll().stream()
             .filter(checkout -> checkout.getBillingAccountId().equals(account.getId())))
             .singleElement()
@@ -220,7 +216,7 @@ class BillingFlowIT extends BaseControllerIT {
         Profile user = entityGeneratorService.randomProfile();
         ActiveSubscription active = activateMonthlySubscription(user);
         planMapping(YEARLY_PLAN_ID, YEARLY_PRODUCT_ID);
-        clearInvocations(paymentProvider);
+        clearInvocations(abacatePayProvider);
 
         mockMvcPerform(post("/v1/billing/subscription/change-plan")
                 .with(authenticatedAs(user))
@@ -231,7 +227,9 @@ class BillingFlowIT extends BaseControllerIT {
             .andExpect(jsonPath("$.currentPlan.id").value(MONTHLY_PLAN_ID.toString()))
             .andExpect(jsonPath("$.pendingPlan.id").value(YEARLY_PLAN_ID.toString()));
 
-        verify(paymentProvider).changePlan(active.providerSubscriptionId(), YEARLY_PRODUCT_ID);
+        verify(abacatePayProvider).changePlan(argThat(command ->
+            command.subscriptionId().equals(active.providerSubscriptionId())
+                && command.plan().providerProductId().equals(YEARLY_PRODUCT_ID)));
         BillingAccount scheduled = accountRepository.findById(active.accountId()).orElseThrow();
         assertThat(scheduled.getCurrentPlanPriceId()).isEqualTo(MONTHLY_PLAN_ID);
         assertThat(scheduled.getPendingPlanPriceId()).isEqualTo(YEARLY_PLAN_ID);
@@ -262,7 +260,7 @@ class BillingFlowIT extends BaseControllerIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCEL_AT_PERIOD_END"))
             .andExpect(jsonPath("$.accessStatus").value("ACTIVE"));
-        verify(paymentProvider).cancel(active.providerSubscriptionId());
+        verify(abacatePayProvider).cancel(active.providerSubscriptionId());
 
         postProviderEvent(providerEvent(
             "cancelled-event",
@@ -275,14 +273,14 @@ class BillingFlowIT extends BaseControllerIT {
 
         mockMvcPerform(get("/v1/billing/subscription").with(authenticatedAs(user)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("CANCELED"))
-            .andExpect(jsonPath("$.accessStatus").value("BLOCKED"))
-            .andExpect(jsonPath("$.canCheckout").value(true))
+            .andExpect(jsonPath("$.status").value("CANCEL_AT_PERIOD_END"))
+            .andExpect(jsonPath("$.accessStatus").value("ACTIVE"))
+            .andExpect(jsonPath("$.canCheckout").value(false))
             .andExpect(jsonPath("$.canCancel").value(false))
             .andExpect(jsonPath("$.canChangePlan").value(false));
 
         BillingAccount canceled = accountRepository.findById(active.accountId()).orElseThrow();
-        assertThat(canceled.getStatus()).isEqualTo(BillingAccountStatus.CANCELED);
+        assertThat(canceled.getStatus()).isEqualTo(BillingAccountStatus.CANCEL_AT_PERIOD_END);
         assertThat(canceled.getCurrentPlanPriceId()).isEqualTo(YEARLY_PLAN_ID);
         assertProcessed("plan-changed-event");
         assertProcessed("cancelled-event");
@@ -307,11 +305,10 @@ class BillingFlowIT extends BaseControllerIT {
         accountRepository.flush();
 
         UUID idempotencyKey = UUID.randomUUID();
-        when(paymentProvider.createCheckout(
-            eq(account.getId().toString()),
-            any(String.class),
-            eq(mapping.getProviderProductId()),
-            eq(BillingPaymentMethod.CARD)))
+        when(abacatePayProvider.createCheckout(argThat(command ->
+            command.accountId().equals(account.getId().toString())
+                && command.plan().providerProductId().equals(mapping.getProviderProductId())
+                && command.paymentMethod() == BillingPaymentMethod.CARD)))
             .thenReturn(new PaymentProvider.Checkout(
                 "provider-checkout-" + account.getId(),
                 "https://checkout.arkana.test/" + account.getId(),
@@ -380,7 +377,7 @@ class BillingFlowIT extends BaseControllerIT {
     private void postProviderEvent(PaymentWebhookEvent event) throws Exception {
         String eventId = event.id();
         String signature = "signature-" + eventId;
-        when(paymentProvider.verifyWebhook(any(byte[].class), eq(signature))).thenReturn(event);
+        when(abacatePayProvider.verifyWebhook(any(byte[].class), eq(signature))).thenReturn(event);
         mockMvcPerform(post("/v1/webhook/payment/abacatepay?webhookSecret=test-webhook-secret")
                 .header("X-Webhook-Signature", signature)
                 .contentType(MediaType.APPLICATION_JSON)

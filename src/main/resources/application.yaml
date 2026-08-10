@@ -27,6 +27,8 @@ spring:
           jws-algorithms: ES256
 
 arkana:
+  billing:
+    provider: ${BILLING_PROVIDER:ABACATEPAY}
   resend:
     api-key: ${RESEND_API_KEY:}
     from: ${RESEND_FROM:Arkana <hello@arkana.app>}
@@ -34,6 +36,10 @@ arkana:
     api-key: ${ABACATEPAY_API_KEY:}
     webhook-secret: ${ABACATEPAY_WEBHOOK_SECRET:}
     webhook-hmac-key: ${ABACATEPAY_WEBHOOK_HMAC_KEY:}
+  asaas:
+    api-key: ${ASAAS_API_KEY:}
+    api-url: ${ASAAS_API_URL:https://api-sandbox.asaas.com/v3}
+    webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
 
 management:
   endpoints:

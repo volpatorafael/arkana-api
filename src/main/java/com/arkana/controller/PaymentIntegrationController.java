@@ -1,6 +1,7 @@
 package com.arkana.controller;
 
 import com.arkana.dto.billing.WebhookAcceptedResponse;
+import com.arkana.domain.BillingProvider;
 import com.arkana.service.BillingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -33,7 +34,15 @@ public class PaymentIntegrationController {
       @RequestHeader("X-Webhook-Signature") String signature,
       @RequestBody byte[] raw) {
     requireSecret(this.webhookSecret, webhookSecret);
-    billing.webhook(raw, signature);
+    billing.webhook(BillingProvider.ABACATEPAY, raw, signature);
+    return new WebhookAcceptedResponse(true);
+  }
+
+  @PostMapping("/webhook/payment/asaas")
+  WebhookAcceptedResponse asaasWebhook(
+      @RequestHeader("asaas-access-token") String token,
+      @RequestBody byte[] raw) {
+    billing.webhook(BillingProvider.ASAAS, raw, token);
     return new WebhookAcceptedResponse(true);
   }
 

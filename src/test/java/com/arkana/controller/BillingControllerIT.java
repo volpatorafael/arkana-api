@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -31,8 +30,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,9 +56,6 @@ class BillingControllerIT extends BaseControllerIT {
     private BillingPlanPriceRepository planRepository;
     @Autowired
     private BillingPromotionCampaignPriceRepository campaignPriceRepository;
-
-    @MockitoBean
-    private PaymentProvider paymentProvider;
 
     @Test
     void shouldStartTrialOnlyForAuthenticatedUser() throws Exception {
@@ -190,11 +186,10 @@ class BillingControllerIT extends BaseControllerIT {
         BillingCheckout secondCheckout =
             entityGeneratorService.randomBillingCheckout(secondAccount, MONTHLY_PLAN_ID, sharedKey);
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30);
-        when(paymentProvider.createCheckout(
-            eq(firstAccount.getId().toString()),
-            anyString(),
-            eq(mapping.getProviderProductId()),
-            eq(BillingPaymentMethod.CARD)))
+        when(abacatePayProvider.createCheckout(argThat(command ->
+            command.accountId().equals(firstAccount.getId().toString())
+                && command.plan().providerProductId().equals(mapping.getProviderProductId())
+                && command.paymentMethod() == BillingPaymentMethod.CARD)))
             .thenReturn(new PaymentProvider.Checkout("provider-first", "https://checkout.test/first", expiresAt));
 
         mockMvcPerform(post("/v1/billing/checkouts")
@@ -235,8 +230,8 @@ class BillingControllerIT extends BaseControllerIT {
         assertThat(accountRepository.findById(firstAccount.getId()).orElseThrow().isCancelAtPeriodEnd()).isTrue();
         assertThat(accountRepository.findById(secondAccount.getId()).orElseThrow().getStatus())
             .isEqualTo(BillingAccountStatus.ACTIVE);
-        verify(paymentProvider).cancel(firstSubscription.getProviderSubscriptionId());
-        verify(paymentProvider, never()).cancel(secondSubscription.getProviderSubscriptionId());
+        verify(abacatePayProvider).cancel(firstSubscription.getProviderSubscriptionId());
+        verify(abacatePayProvider, never()).cancel(secondSubscription.getProviderSubscriptionId());
     }
 
     @Test
@@ -260,10 +255,11 @@ class BillingControllerIT extends BaseControllerIT {
         assertThat(accountRepository.findById(firstAccount.getId()).orElseThrow().getPendingPlanPriceId())
             .isEqualTo(YEARLY_PLAN_ID);
         assertThat(accountRepository.findById(secondAccount.getId()).orElseThrow().getPendingPlanPriceId()).isNull();
-        verify(paymentProvider).changePlan(
-            firstSubscription.getProviderSubscriptionId(), mapping.getProviderProductId());
-        verify(paymentProvider, never()).changePlan(
-            secondSubscription.getProviderSubscriptionId(), mapping.getProviderProductId());
+        verify(abacatePayProvider).changePlan(argThat(command ->
+            command.subscriptionId().equals(firstSubscription.getProviderSubscriptionId())
+                && command.plan().providerProductId().equals(mapping.getProviderProductId())));
+        verify(abacatePayProvider, never()).changePlan(argThat(command ->
+            command.subscriptionId().equals(secondSubscription.getProviderSubscriptionId())));
     }
 
     private BillingAccount billingAccount(Profile owner, BillingAccountStatus status) {

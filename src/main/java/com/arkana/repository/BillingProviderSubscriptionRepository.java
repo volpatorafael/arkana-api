@@ -15,4 +15,6 @@ public interface BillingProviderSubscriptionRepository extends JpaRepository<Bil
   Optional<BillingProviderSubscription> findByProviderAndProviderSubscriptionId(
       BillingProvider provider,
       String subscriptionId);
+
+  Optional<BillingProviderSubscription> findFirstByBillingAccountId(UUID accountId);
 }

@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260810-02-add-billing-current-provider
+      author: arkana
+      changes:
+        - addColumn:
+            tableName: billing_accounts
+            columns:
+              - column:
+                  name: current_provider
+                  type: varchar(32)
+        - sql:
+            sql: |
+              update billing_accounts ba
+              set current_provider = (
+                select min(bps.provider)
+                from billing_provider_subscriptions bps
+                where bps.billing_account_id = ba.id
+              )
+              where exists (
+                select 1
+                from billing_provider_subscriptions bps
+                where bps.billing_account_id = ba.id
+              )

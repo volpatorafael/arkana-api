@@ -7,6 +7,8 @@ import com.arkana.dto.billing.SubscriptionPlanResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
+
 @Mapper
 public interface BillingPlanPriceMapper {
   @Mapping(target = "interval", source = "billingInterval")
@@ -21,11 +23,12 @@ public interface BillingPlanPriceMapper {
   @Mapping(target = "currency", source = "plan.currency")
   @Mapping(target = "trialDays", source = "plan.trialDays")
   @Mapping(target = "annualSavingsPercent", source = "annualSavingsPercent")
-  @Mapping(target = "availablePaymentMethods", source = "plan.availablePaymentMethods")
+  @Mapping(target = "availablePaymentMethods", source = "availablePaymentMethods")
   @Mapping(target = "promotion", source = "promotion")
   SubscriptionPlanResponse toResponse(
       BillingPlanPrice plan,
       Integer compareAtAmount,
       Double annualSavingsPercent,
+      List<String> availablePaymentMethods,
       PlanPromotionResponse promotion);
 }

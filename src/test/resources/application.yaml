@@ -28,8 +28,12 @@ arkana:
   cors:
     allowed-origins: http://localhost:5173
   abacatepay:
+    api-key: test-api-key
     webhook-secret: test-webhook-secret
     webhook-hmac-key: test-hmac-key
+  asaas:
+    api-key: test-asaas-api-key
+    webhook-token: test-asaas-webhook-token
 
 logging:
   level:

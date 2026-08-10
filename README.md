@@ -23,7 +23,8 @@ com.arkana
 ├── domain            JPA entities and persistent enums
 ├── repository        Spring Data repositories
 ├── integration       external-service ports
-│   └── abacatepay    AbacatePay adapter
+│   ├── abacatepay    AbacatePay adapter
+│   └── asaas         Asaas adapter
 ├── exception         RFC 9457 exception translation
 ├── config
 ├── security
@@ -106,13 +107,34 @@ Optional or environment-specific variables:
 
 ```text
 ARKANA_ALLOWED_ORIGINS
+BILLING_PROVIDER
 RESEND_API_KEY
 RESEND_FROM
 ABACATEPAY_API_KEY
 ABACATEPAY_WEBHOOK_SECRET
 ABACATEPAY_WEBHOOK_HMAC_KEY
+ASAAS_API_KEY
+ASAAS_API_URL
+ASAAS_WEBHOOK_TOKEN
 ARKANA_RECONCILIATION_SECRET
 ```
+
+`BILLING_PROVIDER` accepts `ABACATEPAY` (the default) or `ASAAS` and selects
+the provider only for new checkouts. The provider used to create a paid
+subscription is persisted, so cancellation, plan changes, and webhooks keep
+using that provider after a configuration change.
+
+Asaas uses its hosted recurring checkout with credit card only. Set
+`ASAAS_API_URL=https://api-sandbox.asaas.com/v3` for sandbox or
+`https://api.asaas.com/v3` for production. Configure the Asaas webhook at
+`/v1/webhook/payment/asaas` with a dedicated authentication token sent in the
+`asaas-access-token` header. Do not reuse `ASAAS_API_KEY` as that token.
+
+`PIX_AUTOMATIC` is deliberately unavailable through the Asaas adapter. Asaas
+ordinary Pix checkout is not equivalent to Pix Automático and is not exposed
+under that payment-method name. With `BILLING_PROVIDER=ASAAS`, billing plans
+and account overview advertise only `CARD`, and attempts to request
+`PIX_AUTOMATIC` fail before any provider request is sent.
 
 The local profile defaults to `jdbc:postgresql://localhost:5432/arkana` with
 username and password `arkana`. QA and production receive datasource values

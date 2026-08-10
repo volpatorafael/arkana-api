@@ -8,7 +8,10 @@ import com.arkana.domain.BillingPlanPrice;
 import com.arkana.domain.BillingPromotionCampaign;
 import com.arkana.domain.BillingPromotionCampaignPrice;
 import com.arkana.domain.BillingProvider;
+import com.arkana.domain.BillingProviderEventType;
 import com.arkana.domain.Profile;
+import com.arkana.controller.BaseControllerIT;
+import com.arkana.integration.dto.PaymentWebhookEvent;
 import com.arkana.repository.BillingAccountRepository;
 import com.arkana.repository.BillingCheckoutRepository;
 import com.arkana.repository.BillingPlanPriceRepository;
@@ -22,26 +25,22 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,10 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@Transactional
-class ApiMigrationIntegrationTest {
+class ApiMigrationIntegrationTest extends BaseControllerIT {
   private static final UUID USER_ONE = UUID.fromString("10000000-0000-0000-0000-000000000001");
   private static final UUID USER_TWO = UUID.fromString("20000000-0000-0000-0000-000000000002");
   private static final UUID USER_THREE = UUID.fromString("20000000-0000-0000-0000-000000000003");
@@ -90,12 +86,6 @@ class ApiMigrationIntegrationTest {
         .subject(id.toString())
         .claim("aud", "authenticated")
         .claim("email", id + "@arkana.test"));
-  }
-
-  private static String hmac(String payload, String key) throws Exception {
-    Mac mac = Mac.getInstance("HmacSHA256");
-    mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-    return Base64.getEncoder().encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
   }
 
   @BeforeEach
@@ -244,7 +234,18 @@ class ApiMigrationIntegrationTest {
         .build());
     String payload = "{\"id\":\"evt-1\",\"event\":\"subscription.completed\",\"data\":{\"subscription\":{\"id\":\"sub-1\",\"currentPeriodStart\":\"" + now + "\",\"currentPeriodEnd\":\"" + now.plusMonths(
         1) + "\"},\"checkout\":{\"externalId\":\"" + checkout + "\"}}}";
-    String signature = hmac(payload, "test-hmac-key");
+    String signature = "valid-signature";
+    when(abacatePayProvider.verifyWebhook(any(byte[].class), eq(signature)))
+        .thenReturn(new PaymentWebhookEvent(
+            "evt-1",
+            BillingProviderEventType.COMPLETED,
+            payload,
+            "sub-1",
+            null,
+            checkout.toString(),
+            now,
+            now.plusMonths(1),
+            null));
     for (int attempt = 0; attempt < 2; attempt++)
       mvc.perform(post("/v1/webhook/payment/abacatepay?webhookSecret=test-webhook-secret")
               .header("X-Webhook-Signature", signature).contentType(MediaType.APPLICATION_JSON).content(payload))

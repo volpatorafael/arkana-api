@@ -46,6 +46,9 @@ public class BillingAccount {
   private OffsetDateTime trialEndsAt;
   @Column(name = "current_plan_price_id")
   private UUID currentPlanPriceId;
+  @Column(name = "current_provider", length = 32)
+  @Enumerated(EnumType.STRING)
+  private BillingProvider currentProvider;
   @Column(name = "pending_plan_price_id")
   private UUID pendingPlanPriceId;
   @Column(name = "current_period_start")
@@ -98,5 +101,9 @@ public class BillingAccount {
     if (trialEnd != null) {
       trialEndsAt = trialEnd;
     }
+  }
+
+  public void useProvider(BillingProvider provider) {
+    currentProvider = provider;
   }
 }

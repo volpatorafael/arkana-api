@@ -25,6 +25,7 @@ import com.arkana.dto.billing.CreateBillingCheckoutRequest;
 import com.arkana.dto.billing.SubscriptionPlanResponse;
 import com.arkana.dto.billing.PlanPromotionResponse;
 import com.arkana.integration.PaymentProvider;
+import com.arkana.integration.PaymentProviderRegistry;
 import com.arkana.integration.dto.PaymentWebhookEvent;
 import com.arkana.mapper.BillingAccountMapper;
 import com.arkana.mapper.BillingCheckoutMapper;
@@ -68,8 +69,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BillingService {
-  private static final BillingProvider PAYMENT_PROVIDER = BillingProvider.ABACATEPAY;
-
   private final BillingAccountRepository accounts;
   private final BillingPlanPriceRepository plans;
   private final BillingProviderPlanMappingRepository planMappings;
@@ -81,7 +80,7 @@ public class BillingService {
   private final BillingCheckoutRepository checkouts;
   private final BillingProviderEventRepository providerEvents;
   private final ProfileRepository profiles;
-  private final PaymentProvider provider;
+  private final PaymentProviderRegistry providerRegistry;
   private final BillingAccountMapper accountMapper;
   private final BillingCheckoutMapper checkoutMapper;
   private final BillingPlanPriceMapper planMapper;
@@ -150,11 +149,18 @@ public class BillingService {
     }
     BillingAccount value = account.get();
     OffsetDateTime currentTime = now();
-    BillingAccountStatus effectiveStatus = value.getStatus() == BillingAccountStatus.TRIALING
+    BillingAccountStatus effectiveStatus;
+    if (value.getStatus() == BillingAccountStatus.TRIALING
         && value.getTrialEndsAt() != null
-        && !value.getTrialEndsAt().isAfter(currentTime)
-        ? BillingAccountStatus.EXPIRED
-        : value.getStatus();
+        && !value.getTrialEndsAt().isAfter(currentTime)) {
+      effectiveStatus = BillingAccountStatus.EXPIRED;
+    } else if (value.getStatus() == BillingAccountStatus.CANCEL_AT_PERIOD_END
+        && value.getCurrentPeriodEnd() != null
+        && !value.getCurrentPeriodEnd().isAfter(currentTime)) {
+      effectiveStatus = BillingAccountStatus.CANCELED;
+    } else {
+      effectiveStatus = value.getStatus();
+    }
     OffsetDateTime overrideEnd = activeOverride(value, currentTime);
     return accountMapper.toOverview(
         value,
@@ -163,14 +169,12 @@ public class BillingService {
         plan(value.getCurrentPlanPriceId()),
         plan(value.getPendingPlanPriceId()),
         overrideEnd,
-        List.of("PIX_AUTOMATIC", "CARD"),
+        availablePaymentMethods(),
         List.of(
             BillingAccountStatus.PENDING_PAYMENT,
             BillingAccountStatus.EXPIRED,
             BillingAccountStatus.CANCELED).contains(effectiveStatus),
-        List.of(
-            BillingAccountStatus.ACTIVE,
-            BillingAccountStatus.CANCEL_AT_PERIOD_END).contains(value.getStatus()),
+        value.getStatus() == BillingAccountStatus.ACTIVE,
         value.getStatus() == BillingAccountStatus.ACTIVE,
         promotion(value.getId(), currentTime));
   }
@@ -178,6 +182,11 @@ public class BillingService {
   @Transactional
   public BillingCheckoutResponse checkout(UUID ownerId, UUID key, CreateBillingCheckoutRequest request) {
     BillingPaymentMethod paymentMethod = paymentMethod(request.paymentMethod());
+    BillingProvider selectedProvider = providerRegistry.selectedProvider();
+    PaymentProvider provider = providerRegistry.selected();
+    if (!provider.supportedPaymentMethods().contains(paymentMethod)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is not available.");
+    }
 
     BillingAccount account = account(ownerId);
     Optional<BillingCheckout> existing =
@@ -193,16 +202,19 @@ public class BillingService {
 
     BillingPlanPrice selectedPlan = plans.findById(request.planPriceId())
         .filter(BillingPlanPrice::isActive)
+        .filter(plan -> plan.getAvailablePaymentMethods().contains(paymentMethod.name()))
         .filter(plan -> plan.isDefaultPlan()
             || isPromotionalPlanEligible(account.getId(), plan.getId(), currentTime))
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.SERVICE_UNAVAILABLE,
             "The plan is not configured or is not eligible at the payment provider."));
-    BillingProviderPlanMapping mapping = planMappings
-        .findByPlanPriceIdAndProvider(selectedPlan.getId(), PAYMENT_PROVIDER)
+    String providerProductId = provider.requiresPlanMapping()
+        ? planMappings.findByPlanPriceIdAndProvider(selectedPlan.getId(), selectedProvider)
+        .map(BillingProviderPlanMapping::getProviderProductId)
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.SERVICE_UNAVAILABLE,
-            "The plan is not configured or is not eligible at the payment provider."));
+            "The plan is not configured or is not eligible at the payment provider."))
+        : null;
 
     UUID checkoutId = UUID.randomUUID();
     BillingCheckout checkout = checkouts.saveAndFlush(BillingCheckout.builder()
@@ -212,15 +224,16 @@ public class BillingService {
         .paymentMethod(paymentMethod)
         .status(BillingCheckoutStatus.CREATING)
         .idempotencyKey(key)
-        .provider(PAYMENT_PROVIDER)
+        .provider(selectedProvider)
         .expiresAt(currentTime.plusMinutes(30))
         .build());
     try {
       PaymentProvider.Checkout providerCheckout = provider.createCheckout(
-          account.getId().toString(),
-          checkoutId.toString(),
-          mapping.getProviderProductId(),
-          paymentMethod);
+          new PaymentProvider.CreateCheckout(
+              account.getId().toString(),
+              checkoutId.toString(),
+              paymentMethod,
+              providerPlan(selectedPlan, providerProductId)));
       checkout.pending(
           providerCheckout.providerId(),
           providerCheckout.url(),
@@ -240,7 +253,9 @@ public class BillingService {
   @Transactional
   public BillingOverview cancel(UUID ownerId) {
     BillingAccount account = account(ownerId);
-    provider.cancel(subscription(account.getId()).getProviderSubscriptionId());
+    BillingProvider activeProvider = activeProvider(account);
+    BillingProviderSubscription subscription = subscription(account.getId(), activeProvider);
+    providerRegistry.get(activeProvider).cancel(subscription.getProviderSubscriptionId());
     OffsetDateTime currentTime = now();
     account.cancelAtPeriodEnd();
     eligibilities.findAllByBillingAccountIdAndStatusIn(
@@ -255,34 +270,50 @@ public class BillingService {
   @Transactional
   public BillingOverview changePlan(UUID ownerId, ChangeBillingPlanRequest request) {
     BillingAccount account = account(ownerId);
-    BillingProviderSubscription subscription = subscription(account.getId());
-    BillingProviderPlanMapping mapping = planMappings
-        .findByPlanPriceIdAndProvider(request.planPriceId(), PAYMENT_PROVIDER)
+    BillingProvider activeProvider = activeProvider(account);
+    PaymentProvider provider = providerRegistry.get(activeProvider);
+    BillingProviderSubscription subscription = subscription(account.getId(), activeProvider);
+    BillingPlanPrice selectedPlan = plans.findById(request.planPriceId())
+        .filter(BillingPlanPrice::isActive)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plan is not available."));
-    provider.changePlan(subscription.getProviderSubscriptionId(), mapping.getProviderProductId());
+    String providerProductId = provider.requiresPlanMapping()
+        ? planMappings.findByPlanPriceIdAndProvider(request.planPriceId(), activeProvider)
+        .map(BillingProviderPlanMapping::getProviderProductId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plan is not available."))
+        : null;
+    provider.changePlan(new PaymentProvider.ChangePlan(
+        subscription.getProviderSubscriptionId(),
+        providerPlan(selectedPlan, providerProductId)));
     account.schedulePlan(request.planPriceId());
     return overview(ownerId);
   }
 
   @Transactional
-  public void webhook(byte[] raw, String signature) {
+  public void webhook(BillingProvider paymentProvider, byte[] raw, String signature) {
+    PaymentProvider provider = providerRegistry.get(paymentProvider);
     PaymentWebhookEvent event = provider.verifyWebhook(raw, signature);
     String eventId = event.id();
-    if (providerEvents.existsByProviderAndProviderEventId(PAYMENT_PROVIDER, eventId)) {
+    if (providerEvents.existsByProviderAndProviderEventId(paymentProvider, eventId)) {
       return;
     }
 
     BillingProviderEventType eventType = event.eventType();
     BillingProviderEvent providerEvent = providerEvents.save(BillingProviderEvent.builder()
         .id(UUID.randomUUID())
-        .provider(PAYMENT_PROVIDER)
+        .provider(paymentProvider)
         .providerEventId(eventId)
         .eventType(eventType)
         .processingStatus("RECEIVED")
         .rawPayload(event.rawPayload())
         .build());
+    if (eventType == BillingProviderEventType.IGNORED) {
+      providerEvent.ignore();
+      return;
+    }
     WebhookContext context = webhookContext(
+        paymentProvider,
         event.checkoutId(),
+        event.providerCheckoutId(),
         event.subscriptionId(),
         event.productId(),
         eventType == BillingProviderEventType.PLAN_CHANGED);
@@ -291,11 +322,28 @@ public class BillingService {
       return;
     }
 
+    BillingAccount account = accounts.findById(context.accountId()).orElseThrow();
+    updateProviderSubscription(paymentProvider, event, account.getId());
+    if (eventType == BillingProviderEventType.SUBSCRIPTION_LINKED) {
+      providerEvent.process();
+      return;
+    }
+    if (eventType == BillingProviderEventType.PAYMENT_FAILED
+        && context.checkoutId() != null
+        && account.getCurrentProvider() == null) {
+      checkouts.findById(context.checkoutId()).ifPresent(BillingCheckout::fail);
+      providerEvent.process();
+      return;
+    }
+
     BillingAccountStatus status = switch (eventType) {
       case COMPLETED, RENEWED, PLAN_CHANGED ->
           BillingAccountStatus.ACTIVE;
       case PAYMENT_FAILED -> BillingAccountStatus.PAST_DUE;
-      case CANCELED -> BillingAccountStatus.CANCELED;
+      case CANCELED -> account.getCurrentPeriodEnd() != null
+          && account.getCurrentPeriodEnd().isAfter(now())
+          ? BillingAccountStatus.CANCEL_AT_PERIOD_END
+          : BillingAccountStatus.CANCELED;
       default -> BillingAccountStatus.TRIALING;
     };
     OffsetDateTime periodStart = event.periodStart();
@@ -307,11 +355,19 @@ public class BillingService {
           ? periodStart.plusYears(1)
           : periodStart.plusMonths(1);
     }
+    if (status == BillingAccountStatus.CANCEL_AT_PERIOD_END) {
+      periodStart = periodStart == null ? account.getCurrentPeriodStart() : periodStart;
+      periodEnd = periodEnd == null ? account.getCurrentPeriodEnd() : periodEnd;
+    }
 
-    BillingAccount account = accounts.findById(context.accountId()).orElseThrow();
     account.applyProviderState(status, context.planId(), periodStart, periodEnd, trialEnd);
-    updateProviderSubscription(event, account.getId());
-    if (context.checkoutId() != null) {
+    if (status == BillingAccountStatus.ACTIVE) {
+      account.useProvider(paymentProvider);
+    }
+    if (context.checkoutId() != null
+        && List.of(
+            BillingProviderEventType.COMPLETED,
+            BillingProviderEventType.RENEWED).contains(eventType)) {
       checkouts.findById(context.checkoutId()).ifPresent(BillingCheckout::complete);
     }
     if (context.planId() != null) {
@@ -344,17 +400,20 @@ public class BillingService {
     }
   }
 
-  private void updateProviderSubscription(PaymentWebhookEvent event, UUID accountId) {
+  private void updateProviderSubscription(
+      BillingProvider paymentProvider,
+      PaymentWebhookEvent event,
+      UUID accountId) {
     String subscriptionId = event.subscriptionId();
     if (subscriptionId == null) {
       return;
     }
     BillingProviderSubscription subscription = subscriptions
-        .findByBillingAccountIdAndProvider(accountId, PAYMENT_PROVIDER)
+        .findByBillingAccountIdAndProvider(accountId, paymentProvider)
         .orElseGet(() -> BillingProviderSubscription.builder()
             .id(UUID.randomUUID())
             .billingAccountId(accountId)
-            .provider(PAYMENT_PROVIDER)
+            .provider(paymentProvider)
             .providerSubscriptionId(subscriptionId)
             .build());
     subscription.updateSubscriptionId(subscriptionId);
@@ -383,22 +442,24 @@ public class BillingService {
             "Billing account is not ready."));
   }
 
-  private BillingProviderSubscription subscription(UUID accountId) {
-    return subscriptions.findByBillingAccountIdAndProvider(accountId, PAYMENT_PROVIDER)
+  private BillingProviderSubscription subscription(UUID accountId, BillingProvider provider) {
+    return subscriptions.findByBillingAccountIdAndProvider(accountId, provider)
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.CONFLICT,
             "No active provider subscription exists."));
   }
 
   private WebhookContext webhookContext(
+      BillingProvider paymentProvider,
       String checkoutId,
+      String providerCheckoutId,
       String subscriptionId,
       String providerProductId,
       boolean requireMappedProduct) {
     if (checkoutId != null) {
       try {
         Optional<BillingCheckout> checkout = checkouts.findById(UUID.fromString(checkoutId));
-        if (checkout.isPresent()) {
+        if (checkout.isPresent() && checkout.get().getProvider() == paymentProvider) {
           BillingCheckout value = checkout.get();
           String interval = plans.findById(value.getPlanPriceId())
               .map(BillingPlanPrice::getBillingInterval)
@@ -413,24 +474,33 @@ public class BillingService {
         // Continue with the provider subscription lookup.
       }
     }
+    if (providerCheckoutId != null) {
+      Optional<BillingCheckout> checkout = checkouts.findByProviderAndProviderCheckoutId(
+          paymentProvider,
+          providerCheckoutId);
+      if (checkout.isPresent()) {
+        BillingCheckout value = checkout.get();
+        String interval = plans.findById(value.getPlanPriceId())
+            .map(BillingPlanPrice::getBillingInterval)
+            .orElse(null);
+        return new WebhookContext(
+            value.getBillingAccountId(),
+            value.getPlanPriceId(),
+            value.getId(),
+            interval);
+      }
+    }
     if (subscriptionId == null) {
       return null;
     }
-    return subscriptions.findByProviderAndProviderSubscriptionId(PAYMENT_PROVIDER, subscriptionId)
+    return subscriptions.findByProviderAndProviderSubscriptionId(paymentProvider, subscriptionId)
         .map(subscription -> {
           BillingAccount account = accounts.findById(subscription.getBillingAccountId()).orElseThrow();
-          UUID planId = providerProductId == null
-              ? account.getCurrentPlanPriceId()
-              : planMappings.findByProviderAndProviderProductId(PAYMENT_PROVIDER, providerProductId)
-              .map(BillingProviderPlanMapping::getPlanPriceId)
-              .orElseGet(() -> {
-                if (requireMappedProduct) {
-                  throw new ResponseStatusException(
-                      HttpStatus.SERVICE_UNAVAILABLE,
-                      "The provider plan is not configured.");
-                }
-                return account.getCurrentPlanPriceId();
-              });
+          UUID planId = webhookPlanId(
+              paymentProvider,
+              account,
+              providerProductId,
+              requireMappedProduct);
           String interval = planId == null
               ? null
               : plans.findById(planId)
@@ -443,6 +513,29 @@ public class BillingService {
               interval);
         })
         .orElse(null);
+  }
+
+  private UUID webhookPlanId(
+      BillingProvider paymentProvider,
+      BillingAccount account,
+      String providerProductId,
+      boolean planChanged) {
+    if (providerProductId == null) {
+      if (planChanged && account.getPendingPlanPriceId() != null) {
+        return account.getPendingPlanPriceId();
+      }
+      return account.getCurrentPlanPriceId();
+    }
+    return planMappings.findByProviderAndProviderProductId(paymentProvider, providerProductId)
+        .map(BillingProviderPlanMapping::getPlanPriceId)
+        .orElseGet(() -> {
+          if (planChanged) {
+            throw new ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "The provider plan is not configured.");
+          }
+          return account.getCurrentPlanPriceId();
+        });
   }
 
   private BillingPlanSummary plan(UUID planId) {
@@ -621,6 +714,7 @@ public class BillingService {
         plan,
         compareAtAmount,
         savings,
+        availablePaymentMethods(plan),
         promotion);
   }
 
@@ -637,7 +731,46 @@ public class BillingService {
 
   private BillingOverview emptyOverview() {
     return accountMapper.toEmptyOverview(
-        new BillingOverviewMappingSource(List.of("PIX_AUTOMATIC", "CARD")));
+        new BillingOverviewMappingSource(availablePaymentMethods()));
+  }
+
+  private List<String> availablePaymentMethods() {
+    Set<BillingPaymentMethod> supported = providerRegistry.selected().supportedPaymentMethods();
+    return List.of(BillingPaymentMethod.PIX_AUTOMATIC, BillingPaymentMethod.CARD).stream()
+        .filter(supported::contains)
+        .map(Enum::name)
+        .toList();
+  }
+
+  private List<String> availablePaymentMethods(BillingPlanPrice plan) {
+    Set<BillingPaymentMethod> supported = providerRegistry.selected().supportedPaymentMethods();
+    return plan.getAvailablePaymentMethods().stream()
+        .map(BillingPaymentMethod::valueOf)
+        .filter(supported::contains)
+        .map(Enum::name)
+        .toList();
+  }
+
+  private BillingProvider activeProvider(BillingAccount account) {
+    if (account.getCurrentProvider() != null) {
+      return account.getCurrentProvider();
+    }
+    return subscriptions.findFirstByBillingAccountId(account.getId())
+        .map(BillingProviderSubscription::getProvider)
+        .orElseThrow(() -> new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "No active provider subscription exists."));
+  }
+
+  private PaymentProvider.Plan providerPlan(BillingPlanPrice plan, String providerProductId) {
+    return new PaymentProvider.Plan(
+        plan.getId().toString(),
+        plan.getCode(),
+        plan.getName(),
+        plan.getBillingInterval(),
+        plan.getAmount(),
+        plan.getCurrency(),
+        providerProductId);
   }
 
   private String fingerprint(String email) {

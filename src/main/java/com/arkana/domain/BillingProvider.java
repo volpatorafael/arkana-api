@@ -1,5 +1,6 @@
 package com.arkana.domain;
 
 public enum BillingProvider {
-  ABACATEPAY
+  ABACATEPAY,
+  ASAAS
 }

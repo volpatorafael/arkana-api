@@ -86,7 +86,7 @@ public class SecurityConfig {
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of(
         HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT,
-        "Idempotency-Key", "X-Webhook-Signature"));
+        "Idempotency-Key", "X-Webhook-Signature", "asaas-access-token"));
     configuration.setExposedHeaders(List.of("X-Request-Id", "X-API-Version"));
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);

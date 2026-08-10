@@ -1,6 +1,7 @@
 package com.arkana.integration.abacatepay;
 
 import com.arkana.domain.BillingPaymentMethod;
+import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderEventType;
 import com.arkana.integration.PaymentProvider;
 import com.arkana.integration.dto.PaymentWebhookEvent;
@@ -24,6 +25,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @Slf4j
@@ -46,18 +48,29 @@ public class AbacatePayProvider implements PaymentProvider {
   }
 
   @Override
-  public Checkout createCheckout(
-      String account,
-      String checkout,
-      String product,
-      BillingPaymentMethod method) {
+  public BillingProvider provider() {
+    return BillingProvider.ABACATEPAY;
+  }
+
+  @Override
+  public Set<BillingPaymentMethod> supportedPaymentMethods() {
+    return Set.of(BillingPaymentMethod.PIX_AUTOMATIC, BillingPaymentMethod.CARD);
+  }
+
+  @Override
+  public boolean requiresPlanMapping() {
+    return true;
+  }
+
+  @Override
+  public Checkout createCheckout(CreateCheckout command) {
     AbacatePayCreateSubscriptionRequest body = new AbacatePayCreateSubscriptionRequest(
         appUrl + "/app?billing=success",
         appUrl + "/app?billing=return",
-        checkout,
-        List.of(new AbacatePayCreateSubscriptionRequest.Item(product, 1)),
-        List.of(method == BillingPaymentMethod.PIX_AUTOMATIC ? "PIX" : "CARD"),
-        new AbacatePayCreateSubscriptionRequest.Metadata(account, checkout));
+        command.checkoutId(),
+        List.of(new AbacatePayCreateSubscriptionRequest.Item(command.plan().providerProductId(), 1)),
+        List.of(command.paymentMethod() == BillingPaymentMethod.PIX_AUTOMATIC ? "PIX" : "CARD"),
+        new AbacatePayCreateSubscriptionRequest.Metadata(command.accountId(), command.checkoutId()));
     AbacatePayCreateSubscriptionResponse response = request(
         "/subscriptions/create",
         body,
@@ -87,10 +100,13 @@ public class AbacatePayProvider implements PaymentProvider {
   }
 
   @Override
-  public void changePlan(String id, String product) {
+  public void changePlan(ChangePlan command) {
     request(
         "/subscriptions/change-plan",
-        new AbacatePayChangePlanRequest(id, product, 1),
+        new AbacatePayChangePlanRequest(
+            command.subscriptionId(),
+            command.plan().providerProductId(),
+            1),
         new TypeReference<AbacatePayApiResponse<Object>>() {
         });
   }
@@ -124,6 +140,7 @@ public class AbacatePayProvider implements PaymentProvider {
           subscription == null ? null : subscription.id(),
           productId(subscription),
           checkoutId(checkout),
+          null,
           subscription == null ? null : subscription.currentPeriodStart(),
           periodEnd(subscription),
           subscription == null ? null : subscription.trialEndsAt());

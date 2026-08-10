@@ -14,7 +14,9 @@ public enum BillingProviderEventType {
   RENEWED("subscription.renewed"),
   PAYMENT_FAILED("subscription.payment_failed"),
   CANCELED("subscription.cancelled"),
-  PLAN_CHANGED("subscription.plan_changed");
+  PLAN_CHANGED("subscription.plan_changed"),
+  SUBSCRIPTION_LINKED("subscription.linked"),
+  IGNORED("ignored");
 
   private final String eventValue;
 
