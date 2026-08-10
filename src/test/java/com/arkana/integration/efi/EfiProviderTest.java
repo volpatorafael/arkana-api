@@ -122,7 +122,7 @@ class EfiProviderTest {
   private void respond(HttpExchange exchange) throws IOException {
     String path = exchange.getRequestURI().getPath();
     String response;
-    if (path.equals("/oauth/token")) {
+    if (path.equals("/v1/authorize")) {
       oauthRequests.incrementAndGet();
       response = "{\"access_token\":\"access-token\",\"expires_in\":300}";
     } else if (path.contains("/subscription/one-step")) {

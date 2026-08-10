@@ -479,7 +479,8 @@ public class EfiProvider implements PaymentProvider {
       }
       String basic = Base64.getEncoder().encodeToString(
           (clientId + ':' + clientSecret).getBytes(StandardCharsets.UTF_8));
-      HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/oauth/token"))
+      String authorizationPath = pix ? "/oauth/token" : "/v1/authorize";
+      HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + authorizationPath))
           .header("Authorization", "Basic " + basic)
           .header("Content-Type", "application/json")
           .POST(HttpRequest.BodyPublishers.ofString("{\"grant_type\":\"client_credentials\"}"))
