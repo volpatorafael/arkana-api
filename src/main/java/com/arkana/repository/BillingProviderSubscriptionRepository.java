@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.List;
+import com.arkana.domain.BillingPaymentMethod;
 
 public interface BillingProviderSubscriptionRepository extends JpaRepository<BillingProviderSubscription, UUID> {
   Optional<BillingProviderSubscription> findByBillingAccountIdAndProvider(
@@ -22,5 +24,10 @@ public interface BillingProviderSubscriptionRepository extends JpaRepository<Bil
 
   Optional<BillingProviderSubscription> findFirstByBillingAccountIdAndStatusIn(
       UUID accountId,
+      Collection<BillingProviderSubscriptionStatus> statuses);
+
+  List<BillingProviderSubscription> findAllByProviderAndPaymentMethodAndStatusIn(
+      BillingProvider provider,
+      BillingPaymentMethod paymentMethod,
       Collection<BillingProviderSubscriptionStatus> statuses);
 }

@@ -4,6 +4,7 @@ import com.arkana.domain.BillingAccount;
 import com.arkana.domain.BillingAccountStatus;
 import com.arkana.domain.BillingCheckout;
 import com.arkana.domain.BillingCheckoutStatus;
+import com.arkana.domain.BillingCheckoutActionType;
 import com.arkana.domain.BillingPaymentMethod;
 import com.arkana.domain.BillingPlanPrice;
 import com.arkana.domain.BillingPromotionCampaign;
@@ -13,6 +14,8 @@ import com.arkana.domain.BillingPromotionEligibilityStatus;
 import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderEvent;
 import com.arkana.domain.BillingProviderEventType;
+import com.arkana.domain.BillingProviderCharge;
+import com.arkana.domain.BillingProviderChargeStatus;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
 import com.arkana.domain.BillingProviderSubscriptionStatus;
@@ -41,6 +44,7 @@ import com.arkana.repository.BillingPromotionCampaignPriceRepository;
 import com.arkana.repository.BillingPromotionCampaignRepository;
 import com.arkana.repository.BillingPromotionEligibilityRepository;
 import com.arkana.repository.BillingProviderEventRepository;
+import com.arkana.repository.BillingProviderChargeRepository;
 import com.arkana.repository.BillingProviderPlanMappingRepository;
 import com.arkana.repository.BillingProviderSubscriptionRepository;
 import com.arkana.repository.ProfileRepository;
@@ -55,6 +59,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -80,15 +85,17 @@ public class BillingService {
   private final BillingAccessOverrideRepository overrides;
   private final BillingCheckoutRepository checkouts;
   private final BillingProviderEventRepository providerEvents;
+  private final BillingProviderChargeRepository providerCharges;
   private final ProfileRepository profiles;
   private final PaymentProviderRegistry providerRegistry;
   private final BillingAccountMapper accountMapper;
   private final BillingCheckoutMapper checkoutMapper;
   private final BillingPlanPriceMapper planMapper;
   private final BillingPromotionMapper promotionMapper;
+  private final Clock clock;
 
-  private static OffsetDateTime now() {
-    return OffsetDateTime.now(ZoneOffset.UTC);
+  private OffsetDateTime now() {
+    return OffsetDateTime.now(clock);
   }
 
   @Transactional(readOnly = true)
@@ -242,7 +249,8 @@ public class BillingService {
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.SERVICE_UNAVAILABLE,
             "The plan is not configured or is not eligible at the payment provider."));
-    String providerProductId = provider.requiresPlanMapping()
+    validateCheckoutDetails(paymentMethod, request);
+    String providerProductId = provider.requiresPlanMapping(paymentMethod)
         ? planMappings.findByPlanPriceIdAndProvider(selectedPlan.getId(), selectedProvider)
         .map(BillingProviderPlanMapping::getProviderProductId)
         .orElseThrow(() -> new ResponseStatusException(
@@ -262,22 +270,58 @@ public class BillingService {
         .expiresAt(currentTime.plusMinutes(30))
         .build());
     try {
+      Profile profile = profiles.findById(ownerId).orElseThrow(() ->
+          new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found."));
       PaymentProvider.Checkout providerCheckout = provider.createCheckout(
           new PaymentProvider.CreateCheckout(
               account.getId().toString(),
               checkoutId.toString(),
+              profile.getEmail(),
               paymentMethod,
               providerPlan(selectedPlan, providerProductId),
-              activeTrial ? account.getTrialEndsAt() : currentTime));
+              activeTrial ? account.getTrialEndsAt() : currentTime,
+              payer(request),
+              request.paymentToken()));
       checkout.pending(
           providerCheckout.providerId(),
+          BillingCheckoutActionType.valueOf(providerCheckout.actionType().name()),
           providerCheckout.url(),
+          providerCheckout.copyPasteCode(),
+          providerCheckout.qrCodeImage(),
           providerCheckout.expiresAt());
+      if (providerCheckout.subscriptionId() != null) {
+        BillingProviderSubscription providerSubscription = BillingProviderSubscription.builder()
+            .id(UUID.randomUUID())
+            .billingAccountId(account.getId())
+            .provider(selectedProvider)
+            .paymentMethod(paymentMethod)
+            .providerSubscriptionId(providerCheckout.subscriptionId())
+            .planPriceId(selectedPlan.getId())
+            .status(BillingProviderSubscriptionStatus.PENDING_AUTHORIZATION)
+            .nextChargeAt(activeTrial ? account.getTrialEndsAt() : currentTime)
+            .build();
+        if (providerCheckout.actionType() == PaymentProvider.ActionType.PENDING_CONFIRMATION) {
+          providerSubscription.schedule(
+              selectedPlan.getId(),
+              activeTrial ? account.getTrialEndsAt() : currentTime);
+          checkout.schedule();
+          account.useProvider(selectedProvider);
+        }
+        BillingProviderSubscription savedSubscription = subscriptions.save(providerSubscription);
+        if (paymentMethod == BillingPaymentMethod.PIX_AUTOMATIC && !activeTrial) {
+          providerCharges.save(BillingProviderCharge.builder()
+              .id(UUID.randomUUID())
+              .providerSubscriptionId(savedSubscription.getId())
+              .provider(selectedProvider)
+              .providerChargeId(providerCheckout.providerId())
+              .dueAt(currentTime.toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC))
+              .amount(selectedPlan.getAmount())
+              .status(BillingProviderChargeStatus.CREATED)
+              .build());
+        }
+      }
       checkouts.flush();
-      return checkoutMapper.toResponse(
-          checkoutId,
-          providerCheckout.url(),
-          providerCheckout.expiresAt());
+      return checkoutMapper.toResponse(checkout);
     } catch (RuntimeException exception) {
       checkout.fail();
       checkouts.flush();
@@ -293,7 +337,12 @@ public class BillingService {
             "Billing account is not ready."));
     BillingProvider activeProvider = activeProvider(account);
     BillingProviderSubscription subscription = subscription(account.getId(), activeProvider);
-    providerRegistry.get(activeProvider).cancel(subscription.getProviderSubscriptionId());
+    PaymentProvider provider = providerRegistry.get(activeProvider);
+    if (subscription.getPaymentMethod() == null) {
+      provider.cancel(subscription.getProviderSubscriptionId());
+    } else {
+      provider.cancel(subscription.getProviderSubscriptionId(), subscription.getPaymentMethod());
+    }
     OffsetDateTime currentTime = now();
     if (subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
         && account.getTrialEndsAt() != null
@@ -330,7 +379,7 @@ public class BillingService {
     BillingPlanPrice selectedPlan = plans.findById(request.planPriceId())
         .filter(BillingPlanPrice::isActive)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plan is not available."));
-    String providerProductId = provider.requiresPlanMapping()
+    String providerProductId = provider.requiresPlanMapping(subscription.getPaymentMethod())
         ? planMappings.findByPlanPriceIdAndProvider(request.planPriceId(), activeProvider)
         .map(BillingProviderPlanMapping::getProviderProductId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Plan is not available."))
@@ -341,7 +390,19 @@ public class BillingService {
         subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
             ? subscription.getNextChargeAt()
             : null,
-        subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED));
+        subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED,
+        subscription.getPaymentMethod()));
+    if (subscription.getPaymentMethod() == BillingPaymentMethod.PIX_AUTOMATIC) {
+      providerCharges.findAllByProviderSubscriptionIdAndStatus(
+          subscription.getId(), BillingProviderChargeStatus.CREATED).forEach(charge -> {
+            provider.updateFutureCharge(
+                subscription.getProviderSubscriptionId(),
+                charge.getProviderChargeId(),
+                charge.getDueAt(),
+                selectedPlan.getAmount());
+            charge.setAmount(selectedPlan.getAmount());
+          });
+    }
     account.schedulePlan(request.planPriceId());
     return overview(ownerId);
   }
@@ -396,7 +457,8 @@ public class BillingService {
           paymentProvider,
           event,
           account.getId(),
-          context.planId());
+          context.planId(),
+          context.paymentMethod());
       subscription.schedule(context.planId(), account.getTrialEndsAt());
       checkout.schedule();
       account.useProvider(paymentProvider);
@@ -407,7 +469,9 @@ public class BillingService {
         paymentProvider,
         event,
         account.getId(),
-        context.planId());
+        context.planId(),
+        context.paymentMethod());
+    reconcileCharge(paymentProvider, event);
     if (eventType == BillingProviderEventType.PLAN_CHANGED
         && providerSubscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
         && account.getStatus() == BillingAccountStatus.TRIALING) {
@@ -486,6 +550,23 @@ public class BillingService {
     providerEvent.process();
   }
 
+  private void reconcileCharge(BillingProvider provider, PaymentWebhookEvent event) {
+    if (event.providerCheckoutId() == null) {
+      return;
+    }
+    providerCharges.findByProviderAndProviderChargeId(provider, event.providerCheckoutId())
+        .ifPresent(charge -> {
+          switch (event.eventType()) {
+            case COMPLETED, RENEWED -> charge.setStatus(BillingProviderChargeStatus.COMPLETED);
+            case PAYMENT_FAILED -> charge.setStatus(BillingProviderChargeStatus.FAILED);
+            case CANCELED -> charge.setStatus(BillingProviderChargeStatus.CANCELED);
+            default -> {
+              return;
+            }
+          }
+        });
+  }
+
   private BillingCheckoutResponse existingCheckout(
       BillingCheckout existing,
       UUID planPriceId,
@@ -496,7 +577,7 @@ public class BillingService {
           HttpStatus.CONFLICT,
           "Idempotency-Key was reused with different parameters.");
     }
-    if (existing.getCheckoutUrl() != null) {
+    if (existing.getActionType() != null) {
       return checkoutMapper.toResponse(existing);
     }
     throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout creation is in progress.");
@@ -514,7 +595,8 @@ public class BillingService {
       BillingProvider paymentProvider,
       PaymentWebhookEvent event,
       UUID accountId,
-      UUID planId) {
+      UUID planId,
+      BillingPaymentMethod contextPaymentMethod) {
     String subscriptionId = event.subscriptionId();
     if (subscriptionId == null) {
       return subscriptions.findByBillingAccountIdAndProvider(accountId, paymentProvider)
@@ -528,11 +610,19 @@ public class BillingService {
             .id(UUID.randomUUID())
             .billingAccountId(accountId)
             .provider(paymentProvider)
+            .paymentMethod(event.paymentMethod() == null
+                ? contextPaymentMethod
+                : event.paymentMethod())
             .providerSubscriptionId(subscriptionId)
             .planPriceId(planId)
             .status(BillingProviderSubscriptionStatus.SCHEDULED)
             .build());
     subscription.updateSubscriptionId(subscriptionId);
+    if (subscription.getPaymentMethod() == null) {
+      subscription.setPaymentMethod(event.paymentMethod() == null
+          ? contextPaymentMethod
+          : event.paymentMethod());
+    }
     return subscriptions.save(subscription);
   }
 
@@ -585,7 +675,8 @@ public class BillingService {
               value.getBillingAccountId(),
               value.getPlanPriceId(),
               value.getId(),
-              interval);
+              interval,
+              value.getPaymentMethod());
         }
       } catch (IllegalArgumentException ignored) {
         // Continue with the provider subscription lookup.
@@ -604,7 +695,8 @@ public class BillingService {
             value.getBillingAccountId(),
             value.getPlanPriceId(),
             value.getId(),
-            interval);
+            interval,
+            value.getPaymentMethod());
       }
     }
     if (subscriptionId == null) {
@@ -623,11 +715,19 @@ public class BillingService {
               : plans.findById(planId)
               .map(BillingPlanPrice::getBillingInterval)
               .orElse(null);
+          UUID relatedCheckoutId = checkouts
+              .findFirstByBillingAccountIdAndProviderAndStatusInOrderByCreatedAtDesc(
+                  account.getId(),
+                  paymentProvider,
+                  List.of(BillingCheckoutStatus.CREATING, BillingCheckoutStatus.PENDING))
+              .map(BillingCheckout::getId)
+              .orElse(null);
           return new WebhookContext(
               account.getId(),
               planId,
-              null,
-              interval);
+              relatedCheckoutId,
+              interval,
+              subscription.getPaymentMethod());
         })
         .orElse(null);
   }
@@ -884,6 +984,7 @@ public class BillingService {
     return subscriptions.findFirstByBillingAccountIdAndStatusIn(
         accountId,
         List.of(
+            BillingProviderSubscriptionStatus.PENDING_AUTHORIZATION,
             BillingProviderSubscriptionStatus.SCHEDULED,
             BillingProviderSubscriptionStatus.ACTIVE));
   }
@@ -908,7 +1009,63 @@ public class BillingService {
     }
   }
 
-  private record WebhookContext(UUID accountId, UUID planId, UUID checkoutId, String interval) {
+  private void validateCheckoutDetails(
+      BillingPaymentMethod paymentMethod,
+      CreateBillingCheckoutRequest request) {
+    if (paymentMethod == BillingPaymentMethod.CARD
+        && (request.paymentToken() == null || request.paymentToken().isBlank())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment token is required for card.");
+    }
+    if (paymentMethod == BillingPaymentMethod.PIX_AUTOMATIC
+        && request.paymentToken() != null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment token is not accepted for Pix.");
+    }
+    if (!validCpf(request.payer().document())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid payer document.");
+    }
+  }
+
+  private boolean validCpf(String value) {
+    if (value == null || !value.matches("[0-9]{11}") || value.chars().distinct().count() == 1) {
+      return false;
+    }
+    for (int digit = 9; digit < 11; digit++) {
+      int sum = 0;
+      for (int index = 0; index < digit; index++) {
+        sum += Character.digit(value.charAt(index), 10) * (digit + 1 - index);
+      }
+      int expected = 11 - sum % 11;
+      if (expected >= 10) {
+        expected = 0;
+      }
+      if (Character.digit(value.charAt(digit), 10) != expected) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private PaymentProvider.Payer payer(CreateBillingCheckoutRequest request) {
+    return new PaymentProvider.Payer(
+        request.payer().name(),
+        request.payer().document(),
+        request.payer().phoneNumber(),
+        new PaymentProvider.Address(
+            request.payer().billingAddress().street(),
+            request.payer().billingAddress().number(),
+            request.payer().billingAddress().neighborhood(),
+            request.payer().billingAddress().zipCode(),
+            request.payer().billingAddress().city(),
+            request.payer().billingAddress().state(),
+            request.payer().billingAddress().complement()));
+  }
+
+  private record WebhookContext(
+      UUID accountId,
+      UUID planId,
+      UUID checkoutId,
+      String interval,
+      BillingPaymentMethod paymentMethod) {
   }
 
   private record CampaignOffer(

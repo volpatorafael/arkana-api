@@ -199,10 +199,10 @@ class BillingControllerIT extends BaseControllerIT {
                 .with(authenticatedAs(firstUser))
                 .header("Idempotency-Key", sharedKey)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"planPriceId\":\"" + MONTHLY_PLAN_ID + "\",\"paymentMethod\":\"CARD\"}"))
+                .content(checkoutJson(MONTHLY_PLAN_ID)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(not(secondCheckout.getId().toString())))
-            .andExpect(jsonPath("$.url").value("https://checkout.test/first"))
+            .andExpect(jsonPath("$.action.url").value("https://checkout.test/first"))
             .andExpect(jsonPath("$.expiresAt").isNotEmpty());
 
         BillingCheckout firstCheckout = checkoutRepository
@@ -276,6 +276,15 @@ class BillingControllerIT extends BaseControllerIT {
         account.setOverrideEndsAt(null);
         accountRepository.flush();
         return account;
+    }
+
+    private String checkoutJson(UUID planId) {
+        return "{\"planPriceId\":\"" + planId + "\",\"paymentMethod\":\"CARD\","
+            + "\"paymentToken\":\"test-token\",\"payer\":{\"name\":\"Maria da Silva\","
+            + "\"document\":\"52998224725\",\"phoneNumber\":\"11999999999\","
+            + "\"billingAddress\":{\"street\":\"Rua Um\",\"number\":\"10\","
+            + "\"neighborhood\":\"Centro\",\"zipCode\":\"01001000\","
+            + "\"city\":\"Sao Paulo\",\"state\":\"SP\"}}}";
     }
 
     private BillingAccount activeBillingAccount(Profile owner) {

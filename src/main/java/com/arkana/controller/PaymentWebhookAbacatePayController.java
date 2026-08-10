@@ -1,7 +1,7 @@
 package com.arkana.controller;
 
-import com.arkana.dto.billing.WebhookAcceptedResponse;
 import com.arkana.domain.BillingProvider;
+import com.arkana.dto.billing.WebhookAcceptedResponse;
 import com.arkana.service.BillingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -15,34 +15,27 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+
 @RestController
-@RequestMapping("/v1")
-public class PaymentIntegrationController {
+@RequestMapping("/v1/webhook/payment/abacatepay")
+public class PaymentWebhookAbacatePayController {
   private final BillingService billing;
   private final String webhookSecret;
 
-  public PaymentIntegrationController(
+  public PaymentWebhookAbacatePayController(
       BillingService billing,
       @Value("${arkana.abacatepay.webhook-secret:}") String webhookSecret) {
     this.billing = billing;
     this.webhookSecret = webhookSecret;
   }
 
-  @PostMapping("/webhook/payment/abacatepay")
+  @PostMapping
   WebhookAcceptedResponse webhook(
       @RequestParam String webhookSecret,
       @RequestHeader("X-Webhook-Signature") String signature,
       @RequestBody byte[] raw) {
     requireSecret(this.webhookSecret, webhookSecret);
     billing.webhook(BillingProvider.ABACATEPAY, raw, signature);
-    return new WebhookAcceptedResponse(true);
-  }
-
-  @PostMapping("/webhook/payment/asaas")
-  WebhookAcceptedResponse asaasWebhook(
-      @RequestHeader("asaas-access-token") String token,
-      @RequestBody byte[] raw) {
-    billing.webhook(BillingProvider.ASAAS, raw, token);
     return new WebhookAcceptedResponse(true);
   }
 

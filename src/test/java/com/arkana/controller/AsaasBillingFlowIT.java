@@ -103,10 +103,9 @@ class AsaasBillingFlowIT extends BaseControllerIT {
             .with(authenticatedAs(user))
             .header("Idempotency-Key", UUID.randomUUID())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"planPriceId\":\"" + MONTHLY_PLAN_ID
-                + "\",\"paymentMethod\":\"CARD\"}"))
+            .content(checkoutJson(MONTHLY_PLAN_ID)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.url").value("https://sandbox.asaas.com/checkout/chk_asaas"));
+        .andExpect(jsonPath("$.action.url").value("https://sandbox.asaas.com/checkout/chk_asaas"));
 
     UUID checkoutId = checkoutRepository.findAll().stream()
         .filter(checkout -> checkout.getBillingAccountId().equals(account.getId()))
@@ -223,7 +222,7 @@ class AsaasBillingFlowIT extends BaseControllerIT {
         .andExpect(status().isCreated());
     createCheckout(user, MONTHLY_PLAN_ID, UUID.randomUUID())
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.url").value("https://sandbox.asaas.com/checkout/chk_open"));
+        .andExpect(jsonPath("$.action.url").value("https://sandbox.asaas.com/checkout/chk_open"));
     createCheckout(user, YEARLY_PLAN_ID, UUID.randomUUID())
         .andExpect(status().isConflict());
 
@@ -320,7 +319,7 @@ class AsaasBillingFlowIT extends BaseControllerIT {
         .andExpect(jsonPath("$.scheduledPlan").isEmpty())
         .andExpect(jsonPath("$.nextChargeAt").isEmpty())
         .andExpect(jsonPath("$.canCheckout").value(true));
-    verify(asaasProvider).cancel("sub_scheduled");
+    verify(asaasProvider).cancel("sub_scheduled", BillingPaymentMethod.CARD);
     assertThat(subscriptionRepository.findByBillingAccountIdAndProvider(
         account.getId(), BillingProvider.ASAAS).orElseThrow().getStatus())
         .isEqualTo(BillingProviderSubscriptionStatus.CANCELED);
@@ -400,7 +399,16 @@ class AsaasBillingFlowIT extends BaseControllerIT {
         .with(authenticatedAs(user))
         .header("Idempotency-Key", idempotencyKey)
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"planPriceId\":\"" + planId + "\",\"paymentMethod\":\"CARD\"}"));
+        .content(checkoutJson(planId)));
+  }
+
+  private String checkoutJson(UUID planId) {
+    return "{\"planPriceId\":\"" + planId + "\",\"paymentMethod\":\"CARD\","
+        + "\"paymentToken\":\"test-token\",\"payer\":{\"name\":\"Maria da Silva\","
+        + "\"document\":\"52998224725\",\"phoneNumber\":\"11999999999\","
+        + "\"billingAddress\":{\"street\":\"Rua Um\",\"number\":\"10\","
+        + "\"neighborhood\":\"Centro\",\"zipCode\":\"01001000\","
+        + "\"city\":\"Sao Paulo\",\"state\":\"SP\"}}}";
   }
 
   private void sendWebhook(String signature, PaymentWebhookEvent event) throws Exception {

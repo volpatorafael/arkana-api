@@ -15,10 +15,12 @@ public class PaymentProviderRegistry {
   public PaymentProviderRegistry(
       @Qualifier("abacatePayProvider") PaymentProvider abacatePay,
       @Qualifier("asaasProvider") PaymentProvider asaas,
+      @Qualifier("efiProvider") PaymentProvider efi,
       Environment environment) {
     providers = Map.of(
         BillingProvider.ABACATEPAY, abacatePay,
-        BillingProvider.ASAAS, asaas);
+        BillingProvider.ASAAS, asaas,
+        BillingProvider.EFI, efi);
     this.environment = environment;
   }
 

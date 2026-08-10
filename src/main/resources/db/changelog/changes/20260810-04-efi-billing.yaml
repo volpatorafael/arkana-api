@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260810-04-efi-billing-state
+      author: arkana
+      changes:
+        - addColumn:
+            tableName: billing_provider_subscriptions
+            columns:
+              - column:
+                  name: payment_method
+                  type: varchar(32)
+        - sql:
+            sql: |
+              update billing_provider_subscriptions
+              set payment_method = 'CARD'
+              where provider = 'ASAAS' and payment_method is null;
+        - addColumn:
+            tableName: billing_checkouts
+            columns:
+              - column:
+                  name: action_type
+                  type: varchar(32)
+              - column:
+                  name: action_code
+                  type: text
+              - column:
+                  name: action_image
+                  type: text
+        - sql:
+            sql: |
+              update billing_checkouts
+              set action_type = 'REDIRECT'
+              where checkout_url is not null and action_type is null;
+        - sql:
+            sql: |
+              alter table billing_provider_subscriptions
+              drop constraint chk_billing_provider_subscription_status;
+              alter table billing_provider_subscriptions
+              add constraint chk_billing_provider_subscription_status
+              check (status in ('PENDING_AUTHORIZATION', 'SCHEDULED', 'ACTIVE', 'CANCELED'));
+
+  - changeSet:
+      id: 20260810-04-create-provider-charges
+      author: arkana
+      changes:
+        - sql:
+            sql: |
+              create table billing_provider_charges (
+                id uuid primary key,
+                provider_subscription_id uuid not null references billing_provider_subscriptions(id),
+                provider varchar(32) not null,
+                provider_charge_id varchar(200) not null,
+                due_at timestamp with time zone not null,
+                amount integer not null check (amount > 0),
+                status varchar(32) not null,
+                created_at timestamp with time zone not null default current_timestamp,
+                unique(provider, provider_charge_id),
+                unique(provider_subscription_id, due_at)
+              );

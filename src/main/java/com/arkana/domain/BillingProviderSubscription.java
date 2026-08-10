@@ -30,6 +30,9 @@ public class BillingProviderSubscription {
   @Column(nullable = false, length = 32)
   @Enumerated(EnumType.STRING)
   private BillingProvider provider;
+  @Column(name = "payment_method", length = 32)
+  @Enumerated(EnumType.STRING)
+  private BillingPaymentMethod paymentMethod;
   @Column(name = "provider_subscription_id", nullable = false, length = 200)
   private String providerSubscriptionId;
   @Column(name = "plan_price_id", nullable = false)
@@ -48,6 +51,12 @@ public class BillingProviderSubscription {
     planPriceId = planId;
     nextChargeAt = chargeAt;
     status = BillingProviderSubscriptionStatus.SCHEDULED;
+  }
+
+  public void awaitAuthorization(UUID planId, OffsetDateTime chargeAt) {
+    planPriceId = planId;
+    nextChargeAt = chargeAt;
+    status = BillingProviderSubscriptionStatus.PENDING_AUTHORIZATION;
   }
 
   public void activate(UUID planId, OffsetDateTime chargeAt) {

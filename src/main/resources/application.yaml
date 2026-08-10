@@ -40,6 +40,19 @@ arkana:
     api-key: ${ASAAS_API_KEY:}
     api-url: ${ASAAS_API_URL:https://api-sandbox.asaas.com/v3}
     webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
+  efi:
+    client-id: ${EFI_CLIENT_ID:}
+    client-secret: ${EFI_CLIENT_SECRET:}
+    charges-url: ${EFI_CHARGES_URL:https://cobrancas-h.api.efipay.com.br}
+    pix-url: ${EFI_PIX_URL:https://pix-h.api.efipay.com.br}
+    pix-key: ${EFI_PIX_KEY:}
+    certificate-path: ${EFI_CERTIFICATE_PATH:}
+    certificate-password: ${EFI_CERTIFICATE_PASSWORD:}
+    charges-webhook-secret: ${EFI_CHARGES_WEBHOOK_SECRET:}
+    pix-webhook-secret: ${EFI_PIX_WEBHOOK_SECRET:}
+    pix-webhook-hmac-key: ${EFI_PIX_WEBHOOK_HMAC_KEY:}
+    pix-require-mtls: ${EFI_PIX_REQUIRE_MTLS:false}
+  webhook-base-url: ${ARKANA_WEBHOOK_BASE_URL:http://localhost:8080}
 
 management:
   endpoints:

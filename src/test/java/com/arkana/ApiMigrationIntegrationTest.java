@@ -328,7 +328,7 @@ class ApiMigrationIntegrationTest extends BaseControllerIT {
             .content("{\"cardId\":null,\"orientation\":null}"))
         .andExpect(status().isConflict())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-        .andExpect(jsonPath("$.detail").value("Completed readings are immutable."));
+        .andExpect(jsonPath("$.detail").value("Card assignment is locked after completion."));
 
     MvcResult comment = mvc.perform(post("/v1/readings/{id}/comments", readingId).with(user(USER_ONE))
             .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"Nota posterior\"}"))

@@ -116,10 +116,22 @@ ABACATEPAY_WEBHOOK_HMAC_KEY
 ASAAS_API_KEY
 ASAAS_API_URL
 ASAAS_WEBHOOK_TOKEN
+EFI_CLIENT_ID
+EFI_CLIENT_SECRET
+EFI_CHARGES_URL
+EFI_PIX_URL
+EFI_PIX_KEY
+EFI_CERTIFICATE_PATH
+EFI_CERTIFICATE_PASSWORD
+EFI_CHARGES_WEBHOOK_SECRET
+EFI_PIX_WEBHOOK_SECRET
+EFI_PIX_WEBHOOK_HMAC_KEY
+EFI_PIX_REQUIRE_MTLS
+ARKANA_WEBHOOK_BASE_URL
 ARKANA_RECONCILIATION_SECRET
 ```
 
-`BILLING_PROVIDER` accepts `ASAAS` (the default) or `ABACATEPAY` and selects
+`BILLING_PROVIDER` accepts `ASAAS` (the default), `ABACATEPAY`, or `EFI` and selects
 the provider only for new checkouts. The provider used to create a paid
 subscription is persisted, so cancellation, plan changes, and webhooks keep
 using that provider after a configuration change.
@@ -140,6 +152,12 @@ ordinary Pix checkout is not equivalent to Pix Automático and is not exposed
 under that payment-method name. With `BILLING_PROVIDER=ASAAS`, billing plans
 and account overview advertise only `CARD`, and attempts to request
 `PIX_AUTOMATIC` fail before any provider request is sent.
+
+Efí supports native recurring card checkout and Pix Automático. Keep the
+default provider unchanged until account approval, plan mappings, mTLS, and
+webhooks have passed homologation. See the
+[Efí production runbook](docs/efi-production-runbook.md) for configuration,
+activation, monitoring, and rollback.
 
 The local profile defaults to `jdbc:postgresql://localhost:5432/arkana` with
 username and password `arkana`. QA and production receive datasource values

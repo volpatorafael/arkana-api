@@ -46,6 +46,13 @@ public class BillingCheckout {
   private String providerCheckoutId;
   @Column(name = "checkout_url", length = 2000)
   private String checkoutUrl;
+  @Column(name = "action_type", length = 32)
+  @Enumerated(EnumType.STRING)
+  private BillingCheckoutActionType actionType;
+  @Column(name = "action_code")
+  private String actionCode;
+  @Column(name = "action_image")
+  private String actionImage;
   @Column(name = "expires_at", nullable = false)
   private OffsetDateTime expiresAt;
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -56,10 +63,19 @@ public class BillingCheckout {
     createdAt = OffsetDateTime.now(ZoneOffset.UTC);
   }
 
-  public void pending(String providerCheckoutId, String checkoutUrl, OffsetDateTime expiresAt) {
+  public void pending(
+      String providerCheckoutId,
+      BillingCheckoutActionType actionType,
+      String checkoutUrl,
+      String actionCode,
+      String actionImage,
+      OffsetDateTime expiresAt) {
     status = BillingCheckoutStatus.PENDING;
     this.providerCheckoutId = providerCheckoutId;
+    this.actionType = actionType;
     this.checkoutUrl = checkoutUrl;
+    this.actionCode = actionCode;
+    this.actionImage = actionImage;
     this.expiresAt = expiresAt;
   }
 

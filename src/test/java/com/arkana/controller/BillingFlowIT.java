@@ -97,7 +97,7 @@ class BillingFlowIT extends BaseControllerIT {
 
         MvcResult firstCheckout = createCheckout(user, idempotencyKey)
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.url").value("https://checkout.arkana.test/monthly"))
+            .andExpect(jsonPath("$.action.url").value("https://checkout.arkana.test/monthly"))
             .andExpect(jsonPath("$.expiresAt").isNotEmpty())
             .andReturn();
         String checkoutId = JsonPath.read(firstCheckout.getResponse().getContentAsString(), "$.id");
@@ -105,7 +105,7 @@ class BillingFlowIT extends BaseControllerIT {
         createCheckout(user, idempotencyKey)
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").value(checkoutId))
-            .andExpect(jsonPath("$.url").value("https://checkout.arkana.test/monthly"));
+            .andExpect(jsonPath("$.action.url").value("https://checkout.arkana.test/monthly"));
 
         verify(abacatePayProvider, times(1)).createCheckout(argThat(command ->
             command.accountId().equals(account.getId().toString())
@@ -260,7 +260,7 @@ class BillingFlowIT extends BaseControllerIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCEL_AT_PERIOD_END"))
             .andExpect(jsonPath("$.accessStatus").value("ACTIVE"));
-        verify(abacatePayProvider).cancel(active.providerSubscriptionId());
+        verify(abacatePayProvider).cancel(active.providerSubscriptionId(), BillingPaymentMethod.CARD);
 
         postProviderEvent(providerEvent(
             "cancelled-event",
@@ -293,7 +293,16 @@ class BillingFlowIT extends BaseControllerIT {
             .with(authenticatedAs(user))
             .header("Idempotency-Key", idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"planPriceId\":\"" + MONTHLY_PLAN_ID + "\",\"paymentMethod\":\"CARD\"}"));
+            .content(checkoutJson(MONTHLY_PLAN_ID)));
+    }
+
+    private String checkoutJson(UUID planId) {
+        return "{\"planPriceId\":\"" + planId + "\",\"paymentMethod\":\"CARD\","
+            + "\"paymentToken\":\"test-token\",\"payer\":{\"name\":\"Maria da Silva\","
+            + "\"document\":\"52998224725\",\"phoneNumber\":\"11999999999\","
+            + "\"billingAddress\":{\"street\":\"Rua Um\",\"number\":\"10\","
+            + "\"neighborhood\":\"Centro\",\"zipCode\":\"01001000\","
+            + "\"city\":\"Sao Paulo\",\"state\":\"SP\"}}}";
     }
 
     private ActiveSubscription activateMonthlySubscription(Profile user) throws Exception {
