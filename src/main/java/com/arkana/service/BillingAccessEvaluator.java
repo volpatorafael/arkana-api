@@ -27,7 +27,8 @@ public class BillingAccessEvaluator {
       return false;
     }
     BillingAccount value = account.get();
-    boolean trial = value.getStatus() == BillingAccountStatus.TRIALING
+    boolean trial = (value.getStatus() == BillingAccountStatus.TRIALING
+        || value.getStatus() == BillingAccountStatus.PAST_DUE)
         && value.getTrialEndsAt() != null
         && value.getTrialEndsAt().isAfter(now);
     boolean subscription = (value.getStatus() == BillingAccountStatus.ACTIVE

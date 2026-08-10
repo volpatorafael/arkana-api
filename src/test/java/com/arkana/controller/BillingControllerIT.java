@@ -11,6 +11,7 @@ import com.arkana.domain.BillingPromotionEligibilityStatus;
 import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
+import com.arkana.domain.BillingProviderSubscriptionStatus;
 import com.arkana.domain.Profile;
 import com.arkana.integration.PaymentProvider;
 import com.arkana.repository.BillingAccountRepository;
@@ -73,7 +74,9 @@ class BillingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.currentPeriodEnd").isEmpty())
             .andExpect(jsonPath("$.cancelAtPeriodEnd").value(false))
             .andExpect(jsonPath("$.currentPlan").isEmpty())
+            .andExpect(jsonPath("$.scheduledPlan").isEmpty())
             .andExpect(jsonPath("$.pendingPlan").isEmpty())
+            .andExpect(jsonPath("$.nextChargeAt").isEmpty())
             .andExpect(jsonPath("$.overrideEndsAt").isEmpty())
             .andExpect(jsonPath("$.availablePaymentMethods[0]").value("PIX_AUTOMATIC"))
             .andExpect(jsonPath("$.availablePaymentMethods[1]").value("CARD"))
@@ -285,8 +288,9 @@ class BillingControllerIT extends BaseControllerIT {
     }
 
     private BillingProviderSubscription subscription(BillingAccount account) {
-        BillingProviderSubscription subscription = entityGeneratorService.randomSubscription(account);
+        BillingProviderSubscription subscription = entityGeneratorService.randomSubscription(account, MONTHLY_PLAN_ID);
         subscription.setProvider(BillingProvider.ABACATEPAY);
+        subscription.setStatus(BillingProviderSubscriptionStatus.ACTIVE);
         accountRepository.flush();
         return subscription;
     }

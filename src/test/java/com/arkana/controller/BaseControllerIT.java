@@ -41,6 +41,7 @@ public abstract class BaseControllerIT extends BaseIT {
         when(abacatePayProvider.requiresPlanMapping()).thenReturn(true);
         when(asaasProvider.supportedPaymentMethods()).thenReturn(java.util.Set.of(BillingPaymentMethod.CARD));
         when(asaasProvider.requiresPlanMapping()).thenReturn(false);
+        when(asaasProvider.supportsDeferredFirstCharge()).thenReturn(true);
     }
 
     protected final ResultActions mockMvcPerform(MockHttpServletRequestBuilder requestBuilder) throws Exception {

@@ -3,6 +3,7 @@ package com.arkana.dto.reading;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.Size;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public final class UpdateReadingRequest {
@@ -14,7 +15,9 @@ public final class UpdateReadingRequest {
   private String question;
   @Size(max = 10000)
   private String context;
-  private boolean clientPresent, spreadPresent, deckPresent, titlePresent, questionPresent, contextPresent;
+  private OffsetDateTime startedAt;
+  private boolean clientPresent, spreadPresent, deckPresent, titlePresent, questionPresent, contextPresent,
+      startedAtPresent;
 
   @JsonSetter
   public void setClientId(UUID value) {
@@ -52,6 +55,12 @@ public final class UpdateReadingRequest {
     contextPresent = true;
   }
 
+  @JsonSetter
+  public void setStartedAt(OffsetDateTime value) {
+    startedAt = value;
+    startedAtPresent = true;
+  }
+
   public UUID clientId() {
     return clientId;
   }
@@ -74,6 +83,10 @@ public final class UpdateReadingRequest {
 
   public String context() {
     return context;
+  }
+
+  public OffsetDateTime startedAt() {
+    return startedAt;
   }
 
   public boolean clientPresent() {
@@ -100,7 +113,12 @@ public final class UpdateReadingRequest {
     return contextPresent;
   }
 
+  public boolean startedAtPresent() {
+    return startedAtPresent;
+  }
+
   public boolean any() {
-    return clientPresent || spreadPresent || deckPresent || titlePresent || questionPresent || contextPresent;
+    return clientPresent || spreadPresent || deckPresent || titlePresent || questionPresent || contextPresent
+        || startedAtPresent;
   }
 }

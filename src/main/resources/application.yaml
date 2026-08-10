@@ -28,7 +28,7 @@ spring:
 
 arkana:
   billing:
-    provider: ${BILLING_PROVIDER:ABACATEPAY}
+    provider: ${BILLING_PROVIDER:ASAAS}
   resend:
     api-key: ${RESEND_API_KEY:}
     from: ${RESEND_FROM:Arkana <hello@arkana.app>}

@@ -15,12 +15,16 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AsaasProviderTest {
+  private static final OffsetDateTime FIRST_CHARGE_AT =
+      OffsetDateTime.of(2026, 8, 24, 12, 30, 0, 0, ZoneOffset.UTC);
   private HttpServer server;
   private AtomicReference<Request> request;
   private AtomicReference<Response> response;
@@ -55,7 +59,8 @@ class AsaasProviderTest {
         "account-id",
         "checkout-id",
         BillingPaymentMethod.CARD,
-        plan("MONTH", 4900)));
+        plan("MONTH", 4900),
+        FIRST_CHARGE_AT));
 
     assertThat(checkout.providerId()).isEqualTo("chk_123");
     assertThat(checkout.url()).isEqualTo("https://sandbox.asaas.com/checkout/chk_123");
@@ -68,19 +73,22 @@ class AsaasProviderTest {
         .contains("\"externalReference\":\"checkout-id\"")
         .contains("\"value\":49.00")
         .contains("\"cycle\":\"MONTHLY\"")
+        .contains("\"nextDueDate\":\"2026-08-24 12:30:00\"")
         .contains("\"successUrl\":\"https://app.getarkana.com/app?billing=success\"");
   }
 
   @Test
   void shouldChangeYearlyPlanAndCancelSubscription() {
-    provider.changePlan(new PaymentProvider.ChangePlan("sub_123", plan("YEAR", 39900)));
+    provider.changePlan(new PaymentProvider.ChangePlan(
+        "sub_123", plan("YEAR", 39900), FIRST_CHARGE_AT, true));
 
     assertThat(request.get().method()).isEqualTo("PUT");
     assertThat(request.get().path()).isEqualTo("/v3/subscriptions/sub_123");
     assertThat(request.get().body())
         .contains("\"value\":399.00")
         .contains("\"cycle\":\"YEARLY\"")
-        .contains("\"updatePendingPayments\":false");
+        .contains("\"nextDueDate\":\"2026-08-24 12:30:00\"")
+        .contains("\"updatePendingPayments\":true");
 
     provider.cancel("sub_123");
     assertThat(request.get().method()).isEqualTo("DELETE");
@@ -93,7 +101,8 @@ class AsaasProviderTest {
         "account-id",
         "checkout-id",
         BillingPaymentMethod.PIX_AUTOMATIC,
-        plan("MONTH", 4900))))
+        plan("MONTH", 4900),
+        FIRST_CHARGE_AT)))
         .hasMessageContaining("Payment method is not available");
 
     String raw = "{\"id\":\"evt_1\",\"event\":\"PAYMENT_CONFIRMED\","
@@ -122,7 +131,8 @@ class AsaasProviderTest {
         "account-id",
         "checkout-id",
         BillingPaymentMethod.CARD,
-        plan("MONTH", 4900))))
+        plan("MONTH", 4900),
+        FIRST_CHARGE_AT)))
         .hasMessageContaining("Asaas rejected the operation");
 
     response.set(new Response(200, "{\"id\":\"chk_without_link\"}"));
@@ -130,7 +140,8 @@ class AsaasProviderTest {
         "account-id",
         "checkout-id",
         BillingPaymentMethod.CARD,
-        plan("MONTH", 4900))))
+        plan("MONTH", 4900),
+        FIRST_CHARGE_AT)))
         .hasMessageContaining("Asaas returned an incomplete checkout");
   }
 

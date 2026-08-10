@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260810-03-billing-scheduled-subscriptions
+      author: arkana
+      changes:
+        - addColumn:
+            tableName: billing_provider_subscriptions
+            columns:
+              - column:
+                  name: plan_price_id
+                  type: uuid
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: next_charge_at
+                  type: timestamp with time zone
+        - sql:
+            sql: |
+              update billing_provider_subscriptions bps
+              set plan_price_id = (
+                    select ba.current_plan_price_id
+                    from billing_accounts ba
+                    where ba.id = bps.billing_account_id
+                  ),
+                  next_charge_at = (
+                    select ba.current_period_end
+                    from billing_accounts ba
+                    where ba.id = bps.billing_account_id
+                  )
+        - addNotNullConstraint:
+            tableName: billing_provider_subscriptions
+            columnName: plan_price_id
+            columnDataType: uuid
+        - addForeignKeyConstraint:
+            baseTableName: billing_provider_subscriptions
+            baseColumnNames: plan_price_id
+            referencedTableName: billing_plan_prices
+            referencedColumnNames: id
+            constraintName: fk_billing_provider_subscription_plan
+        - sql:
+            sql: |
+              alter table billing_provider_subscriptions
+              add constraint chk_billing_provider_subscription_status
+              check (status in ('SCHEDULED', 'ACTIVE', 'CANCELED'))

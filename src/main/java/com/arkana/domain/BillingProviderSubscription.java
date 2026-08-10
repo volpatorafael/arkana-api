@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "billing_provider_subscriptions")
@@ -31,9 +32,33 @@ public class BillingProviderSubscription {
   private BillingProvider provider;
   @Column(name = "provider_subscription_id", nullable = false, length = 200)
   private String providerSubscriptionId;
+  @Column(name = "plan_price_id", nullable = false)
+  private UUID planPriceId;
+  @Column(nullable = false, length = 32)
+  @Enumerated(EnumType.STRING)
+  private BillingProviderSubscriptionStatus status;
+  @Column(name = "next_charge_at")
+  private OffsetDateTime nextChargeAt;
 
   public void updateSubscriptionId(String subscriptionId) {
     providerSubscriptionId = subscriptionId;
+  }
+
+  public void schedule(UUID planId, OffsetDateTime chargeAt) {
+    planPriceId = planId;
+    nextChargeAt = chargeAt;
+    status = BillingProviderSubscriptionStatus.SCHEDULED;
+  }
+
+  public void activate(UUID planId, OffsetDateTime chargeAt) {
+    planPriceId = planId;
+    nextChargeAt = chargeAt;
+    status = BillingProviderSubscriptionStatus.ACTIVE;
+  }
+
+  public void cancel() {
+    status = BillingProviderSubscriptionStatus.CANCELED;
+    nextChargeAt = null;
   }
 
 }

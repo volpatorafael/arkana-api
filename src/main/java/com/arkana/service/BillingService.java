@@ -15,6 +15,7 @@ import com.arkana.domain.BillingProviderEvent;
 import com.arkana.domain.BillingProviderEventType;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
+import com.arkana.domain.BillingProviderSubscriptionStatus;
 import com.arkana.domain.Profile;
 import com.arkana.dto.billing.BillingCheckoutResponse;
 import com.arkana.dto.billing.BillingOverview;
@@ -162,20 +163,34 @@ public class BillingService {
       effectiveStatus = value.getStatus();
     }
     OffsetDateTime overrideEnd = activeOverride(value, currentTime);
+    Optional<BillingProviderSubscription> providerSubscription = currentSubscription(value.getId());
+    BillingProviderSubscription scheduledSubscription = providerSubscription
+        .filter(subscription -> subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED)
+        .orElse(null);
+    boolean hasScheduledSubscription = scheduledSubscription != null;
+    boolean hasProviderSubscription = providerSubscription.isPresent();
+    boolean trialCheckout = effectiveStatus == BillingAccountStatus.TRIALING
+        && providerRegistry.selected().supportsDeferredFirstCharge()
+        && !hasProviderSubscription;
+    boolean regularCheckout = List.of(
+        BillingAccountStatus.PENDING_PAYMENT,
+        BillingAccountStatus.EXPIRED,
+        BillingAccountStatus.CANCELED).contains(effectiveStatus)
+        && !hasProviderSubscription;
     return accountMapper.toOverview(
         value,
         effectiveStatus.name(),
         accessStatus(value, overrideEnd, currentTime),
         plan(value.getCurrentPlanPriceId()),
+        scheduledSubscription == null ? null : plan(scheduledSubscription.getPlanPriceId()),
         plan(value.getPendingPlanPriceId()),
+        providerSubscription.map(BillingProviderSubscription::getNextChargeAt)
+            .orElse(value.getCurrentPeriodEnd()),
         overrideEnd,
         availablePaymentMethods(),
-        List.of(
-            BillingAccountStatus.PENDING_PAYMENT,
-            BillingAccountStatus.EXPIRED,
-            BillingAccountStatus.CANCELED).contains(effectiveStatus),
-        value.getStatus() == BillingAccountStatus.ACTIVE,
-        value.getStatus() == BillingAccountStatus.ACTIVE,
+        trialCheckout || regularCheckout,
+        hasScheduledSubscription || value.getStatus() == BillingAccountStatus.ACTIVE,
+        hasScheduledSubscription || value.getStatus() == BillingAccountStatus.ACTIVE,
         promotion(value.getId(), currentTime));
   }
 
@@ -188,7 +203,10 @@ public class BillingService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is not available.");
     }
 
-    BillingAccount account = account(ownerId);
+    BillingAccount account = accounts.findByOwnerIdForUpdate(ownerId)
+        .orElseThrow(() -> new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Billing account is not ready."));
     Optional<BillingCheckout> existing =
         checkouts.findByBillingAccountIdAndIdempotencyKey(account.getId(), key);
     if (existing.isPresent()) {
@@ -196,8 +214,24 @@ public class BillingService {
     }
 
     OffsetDateTime currentTime = now();
-    if (account.getTrialEndsAt() != null && account.getTrialEndsAt().isAfter(currentTime)) {
+    boolean activeTrial = account.getTrialEndsAt() != null && account.getTrialEndsAt().isAfter(currentTime);
+    if (activeTrial && !provider.supportsDeferredFirstCharge()) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Checkout opens after the trial ends.");
+    }
+    if (currentSubscription(account.getId()).isPresent()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "A provider subscription already exists.");
+    }
+    Optional<BillingCheckout> openCheckout = checkouts
+        .findFirstByBillingAccountIdAndProviderAndStatusInOrderByCreatedAtDesc(
+            account.getId(),
+            selectedProvider,
+            List.of(BillingCheckoutStatus.CREATING, BillingCheckoutStatus.PENDING));
+    if (openCheckout.isPresent()) {
+      BillingCheckout value = openCheckout.get();
+      if (value.getExpiresAt().isAfter(currentTime)) {
+        return existingCheckout(value, request.planPriceId(), paymentMethod);
+      }
+      value.expire();
     }
 
     BillingPlanPrice selectedPlan = plans.findById(request.planPriceId())
@@ -233,7 +267,8 @@ public class BillingService {
               account.getId().toString(),
               checkoutId.toString(),
               paymentMethod,
-              providerPlan(selectedPlan, providerProductId)));
+              providerPlan(selectedPlan, providerProductId),
+              activeTrial ? account.getTrialEndsAt() : currentTime));
       checkout.pending(
           providerCheckout.providerId(),
           providerCheckout.url(),
@@ -252,12 +287,28 @@ public class BillingService {
 
   @Transactional
   public BillingOverview cancel(UUID ownerId) {
-    BillingAccount account = account(ownerId);
+    BillingAccount account = accounts.findByOwnerIdForUpdate(ownerId)
+        .orElseThrow(() -> new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Billing account is not ready."));
     BillingProvider activeProvider = activeProvider(account);
     BillingProviderSubscription subscription = subscription(account.getId(), activeProvider);
     providerRegistry.get(activeProvider).cancel(subscription.getProviderSubscriptionId());
     OffsetDateTime currentTime = now();
+    if (subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
+        && account.getTrialEndsAt() != null
+        && account.getTrialEndsAt().isAfter(currentTime)) {
+      subscription.cancel();
+      account.clearScheduledSubscription();
+      checkouts.findFirstByBillingAccountIdAndProviderAndStatusInOrderByCreatedAtDesc(
+              account.getId(),
+              activeProvider,
+              List.of(BillingCheckoutStatus.SCHEDULED))
+          .ifPresent(BillingCheckout::expire);
+      return overview(ownerId);
+    }
     account.cancelAtPeriodEnd();
+    subscription.cancel();
     eligibilities.findAllByBillingAccountIdAndStatusIn(
             account.getId(),
             List.of(
@@ -269,7 +320,10 @@ public class BillingService {
 
   @Transactional
   public BillingOverview changePlan(UUID ownerId, ChangeBillingPlanRequest request) {
-    BillingAccount account = account(ownerId);
+    BillingAccount account = accounts.findByOwnerIdForUpdate(ownerId)
+        .orElseThrow(() -> new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Billing account is not ready."));
     BillingProvider activeProvider = activeProvider(account);
     PaymentProvider provider = providerRegistry.get(activeProvider);
     BillingProviderSubscription subscription = subscription(account.getId(), activeProvider);
@@ -283,7 +337,11 @@ public class BillingService {
         : null;
     provider.changePlan(new PaymentProvider.ChangePlan(
         subscription.getProviderSubscriptionId(),
-        providerPlan(selectedPlan, providerProductId)));
+        providerPlan(selectedPlan, providerProductId),
+        subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
+            ? subscription.getNextChargeAt()
+            : null,
+        subscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED));
     account.schedulePlan(request.planPriceId());
     return overview(ownerId);
   }
@@ -323,8 +381,56 @@ public class BillingService {
     }
 
     BillingAccount account = accounts.findById(context.accountId()).orElseThrow();
-    updateProviderSubscription(paymentProvider, event, account.getId());
     if (eventType == BillingProviderEventType.SUBSCRIPTION_LINKED) {
+      if (context.checkoutId() == null) {
+        providerEvent.ignore();
+        return;
+      }
+      BillingCheckout checkout = checkouts.findById(context.checkoutId()).orElseThrow();
+      if (!List.of(BillingCheckoutStatus.CREATING, BillingCheckoutStatus.PENDING)
+          .contains(checkout.getStatus())) {
+        providerEvent.ignore();
+        return;
+      }
+      BillingProviderSubscription subscription = updateProviderSubscription(
+          paymentProvider,
+          event,
+          account.getId(),
+          context.planId());
+      subscription.schedule(context.planId(), account.getTrialEndsAt());
+      checkout.schedule();
+      account.useProvider(paymentProvider);
+      providerEvent.process();
+      return;
+    }
+    BillingProviderSubscription providerSubscription = updateProviderSubscription(
+        paymentProvider,
+        event,
+        account.getId(),
+        context.planId());
+    if (eventType == BillingProviderEventType.PLAN_CHANGED
+        && providerSubscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED
+        && account.getStatus() == BillingAccountStatus.TRIALING) {
+      providerSubscription.schedule(context.planId(), providerSubscription.getNextChargeAt());
+      account.confirmScheduledPlan();
+      providerEvent.process();
+      return;
+    }
+    if (eventType == BillingProviderEventType.CANCELED
+        && account.getStatus() == BillingAccountStatus.TRIALING
+        && account.getTrialEndsAt() != null
+        && account.getTrialEndsAt().isAfter(now())) {
+      providerSubscription.cancel();
+      account.clearScheduledSubscription();
+      providerEvent.process();
+      return;
+    }
+    if (eventType == BillingProviderEventType.PAYMENT_FAILED
+        && providerSubscription.getStatus() == BillingProviderSubscriptionStatus.SCHEDULED) {
+      account.markPastDue();
+      if (context.checkoutId() != null) {
+        checkouts.findById(context.checkoutId()).ifPresent(BillingCheckout::fail);
+      }
       providerEvent.process();
       return;
     }
@@ -363,6 +469,10 @@ public class BillingService {
     account.applyProviderState(status, context.planId(), periodStart, periodEnd, trialEnd);
     if (status == BillingAccountStatus.ACTIVE) {
       account.useProvider(paymentProvider);
+      providerSubscription.activate(context.planId(), periodEnd);
+    } else if (status == BillingAccountStatus.CANCELED
+        || status == BillingAccountStatus.CANCEL_AT_PERIOD_END) {
+      providerSubscription.cancel();
     }
     if (context.checkoutId() != null
         && List.of(
@@ -400,13 +510,17 @@ public class BillingService {
     }
   }
 
-  private void updateProviderSubscription(
+  private BillingProviderSubscription updateProviderSubscription(
       BillingProvider paymentProvider,
       PaymentWebhookEvent event,
-      UUID accountId) {
+      UUID accountId,
+      UUID planId) {
     String subscriptionId = event.subscriptionId();
     if (subscriptionId == null) {
-      return;
+      return subscriptions.findByBillingAccountIdAndProvider(accountId, paymentProvider)
+          .orElseThrow(() -> new ResponseStatusException(
+              HttpStatus.CONFLICT,
+              "No active provider subscription exists."));
     }
     BillingProviderSubscription subscription = subscriptions
         .findByBillingAccountIdAndProvider(accountId, paymentProvider)
@@ -415,9 +529,11 @@ public class BillingService {
             .billingAccountId(accountId)
             .provider(paymentProvider)
             .providerSubscriptionId(subscriptionId)
+            .planPriceId(planId)
+            .status(BillingProviderSubscriptionStatus.SCHEDULED)
             .build());
     subscription.updateSubscriptionId(subscriptionId);
-    subscriptions.save(subscription);
+    return subscriptions.save(subscription);
   }
 
   private void lockPromotion(UUID accountId, UUID planId) {
@@ -444,6 +560,7 @@ public class BillingService {
 
   private BillingProviderSubscription subscription(UUID accountId, BillingProvider provider) {
     return subscriptions.findByBillingAccountIdAndProvider(accountId, provider)
+        .filter(value -> value.getStatus() != BillingProviderSubscriptionStatus.CANCELED)
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.CONFLICT,
             "No active provider subscription exists."));
@@ -579,7 +696,8 @@ public class BillingService {
       BillingAccount account,
       OffsetDateTime overrideEnd,
       OffsetDateTime currentTime) {
-    boolean trial = account.getStatus() == BillingAccountStatus.TRIALING
+    boolean trial = List.of(BillingAccountStatus.TRIALING, BillingAccountStatus.PAST_DUE)
+        .contains(account.getStatus())
         && account.getTrialEndsAt() != null
         && account.getTrialEndsAt().isAfter(currentTime);
     boolean subscription = List.of(
@@ -755,11 +873,19 @@ public class BillingService {
     if (account.getCurrentProvider() != null) {
       return account.getCurrentProvider();
     }
-    return subscriptions.findFirstByBillingAccountId(account.getId())
+    return currentSubscription(account.getId())
         .map(BillingProviderSubscription::getProvider)
         .orElseThrow(() -> new ResponseStatusException(
             HttpStatus.CONFLICT,
             "No active provider subscription exists."));
+  }
+
+  private Optional<BillingProviderSubscription> currentSubscription(UUID accountId) {
+    return subscriptions.findFirstByBillingAccountIdAndStatusIn(
+        accountId,
+        List.of(
+            BillingProviderSubscriptionStatus.SCHEDULED,
+            BillingProviderSubscriptionStatus.ACTIVE));
   }
 
   private PaymentProvider.Plan providerPlan(BillingPlanPrice plan, String providerProductId) {

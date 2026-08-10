@@ -14,6 +14,10 @@ public interface PaymentProvider {
 
   boolean requiresPlanMapping();
 
+  default boolean supportsDeferredFirstCharge() {
+    return false;
+  }
+
   Checkout createCheckout(CreateCheckout command);
 
   void cancel(String subscriptionId);
@@ -39,10 +43,15 @@ public interface PaymentProvider {
       String accountId,
       String checkoutId,
       BillingPaymentMethod paymentMethod,
-      Plan plan) {
+      Plan plan,
+      OffsetDateTime firstChargeAt) {
   }
 
-  record ChangePlan(String subscriptionId, Plan plan) {
+  record ChangePlan(
+      String subscriptionId,
+      Plan plan,
+      OffsetDateTime nextChargeAt,
+      boolean updatePendingPayments) {
   }
 
 }

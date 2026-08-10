@@ -26,7 +26,7 @@ public class PaymentProviderRegistry {
     return environment.getProperty(
         "arkana.billing.provider",
         BillingProvider.class,
-        BillingProvider.ABACATEPAY);
+        BillingProvider.ASAAS);
   }
 
   public PaymentProvider selected() {

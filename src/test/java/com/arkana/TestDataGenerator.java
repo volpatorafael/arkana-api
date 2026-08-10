@@ -11,6 +11,7 @@ import com.arkana.domain.BillingPromotionEligibilityStatus;
 import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
+import com.arkana.domain.BillingProviderSubscriptionStatus;
 import com.arkana.domain.Client;
 import com.arkana.domain.Profile;
 import com.arkana.domain.Reading;
@@ -81,13 +82,17 @@ public final class TestDataGenerator {
     }
 
     public static BillingProviderSubscription.BillingProviderSubscriptionBuilder randomSubscription(
-        BillingAccount account) {
+        BillingAccount account,
+        UUID planPriceId) {
         UUID id = UUID.randomUUID();
         return BillingProviderSubscription.builder()
             .id(id)
             .billingAccountId(account.getId())
             .provider(randomValue(List.of(BillingProvider.values())))
-            .providerSubscriptionId("subscription-" + id);
+            .providerSubscriptionId("subscription-" + id)
+            .planPriceId(planPriceId)
+            .status(randomValue(List.of(BillingProviderSubscriptionStatus.values())))
+            .nextChargeAt(randomDate());
     }
 
     public static BillingProviderPlanMapping.BillingProviderPlanMappingBuilder randomPlanMapping(UUID planPriceId) {

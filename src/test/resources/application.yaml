@@ -25,6 +25,8 @@ spring:
           audiences: authenticated
 
 arkana:
+  billing:
+    provider: ABACATEPAY
   cors:
     allowed-origins: http://localhost:5173
   abacatepay:

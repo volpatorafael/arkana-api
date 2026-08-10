@@ -106,4 +106,18 @@ public class BillingAccount {
   public void useProvider(BillingProvider provider) {
     currentProvider = provider;
   }
+
+  public void clearScheduledSubscription() {
+    currentProvider = null;
+    pendingPlanPriceId = null;
+  }
+
+  public void markPastDue() {
+    status = BillingAccountStatus.PAST_DUE;
+    pendingPlanPriceId = null;
+  }
+
+  public void confirmScheduledPlan() {
+    pendingPlanPriceId = null;
+  }
 }

@@ -67,6 +67,8 @@ public class Reading {
       String question,
       boolean contextPresent,
       String context,
+      boolean startedAtPresent,
+      OffsetDateTime startedAt,
       OffsetDateTime updatedAt) {
     if (clientPresent) {
       this.clientId = clientId;
@@ -85,6 +87,9 @@ public class Reading {
     }
     if (contextPresent) {
       this.context = context;
+    }
+    if (startedAtPresent) {
+      this.startedAt = startedAt;
     }
     this.updatedAt = updatedAt;
   }

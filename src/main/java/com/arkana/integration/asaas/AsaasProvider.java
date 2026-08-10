@@ -24,12 +24,15 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Set;
 
 @Component
 @Slf4j
 public class AsaasProvider implements PaymentProvider {
+  private static final DateTimeFormatter CHECKOUT_DATE_TIME =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private final String apiKey;
   private final String apiUrl;
   private final String webhookToken;
@@ -78,6 +81,11 @@ public class AsaasProvider implements PaymentProvider {
   }
 
   @Override
+  public boolean supportsDeferredFirstCharge() {
+    return true;
+  }
+
+  @Override
   public Checkout createCheckout(CreateCheckout command) {
     if (command.paymentMethod() != BillingPaymentMethod.CARD) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment method is not available.");
@@ -97,7 +105,9 @@ public class AsaasProvider implements PaymentProvider {
             amount(command.plan().amount()))),
         new AsaasCreateCheckoutRequest.Subscription(
             cycle(command.plan().interval()),
-            LocalDate.now(ZoneOffset.UTC).toString()));
+            command.firstChargeAt()
+                .withOffsetSameInstant(ZoneOffset.UTC)
+                .format(CHECKOUT_DATE_TIME)));
     AsaasCheckoutResponse response = request("POST", "/checkouts", body, AsaasCheckoutResponse.class);
     if (response == null || response.id() == null || response.link() == null) {
       log.error(
@@ -123,7 +133,12 @@ public class AsaasProvider implements PaymentProvider {
         amount(command.plan().amount()),
         cycle(command.plan().interval()),
         command.plan().name(),
-        false);
+        command.nextChargeAt() == null
+            ? null
+            : command.nextChargeAt()
+                .withOffsetSameInstant(ZoneOffset.UTC)
+                .format(CHECKOUT_DATE_TIME),
+        command.updatePendingPayments());
     request(
         "PUT",
         "/subscriptions/" + encode(command.subscriptionId()),

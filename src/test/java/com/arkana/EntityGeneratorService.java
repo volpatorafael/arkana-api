@@ -68,8 +68,9 @@ public class EntityGeneratorService {
             TestDataGenerator.randomBillingCheckout(account, planPriceId, idempotencyKey).build());
     }
 
-    public BillingProviderSubscription randomSubscription(BillingAccount account) {
-        return subscriptionRepository.saveAndFlush(TestDataGenerator.randomSubscription(account).build());
+    public BillingProviderSubscription randomSubscription(BillingAccount account, UUID planPriceId) {
+        return subscriptionRepository.saveAndFlush(
+            TestDataGenerator.randomSubscription(account, planPriceId).build());
     }
 
     public BillingProviderPlanMapping randomPlanMapping(UUID planPriceId) {

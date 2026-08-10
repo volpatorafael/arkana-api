@@ -20,7 +20,9 @@ public interface BillingAccountMapper {
   @Mapping(target = "currentPeriodEnd", source = "account.currentPeriodEnd")
   @Mapping(target = "cancelAtPeriodEnd", source = "account.cancelAtPeriodEnd")
   @Mapping(target = "currentPlan", source = "currentPlan")
+  @Mapping(target = "scheduledPlan", source = "scheduledPlan")
   @Mapping(target = "pendingPlan", source = "pendingPlan")
+  @Mapping(target = "nextChargeAt", source = "nextChargeAt")
   @Mapping(target = "overrideEndsAt", source = "overrideEndsAt")
   @Mapping(target = "availablePaymentMethods", source = "availablePaymentMethods")
   @Mapping(target = "canCheckout", source = "canCheckout")
@@ -32,7 +34,9 @@ public interface BillingAccountMapper {
       String status,
       String accessStatus,
       BillingPlanSummary currentPlan,
+      BillingPlanSummary scheduledPlan,
       BillingPlanSummary pendingPlan,
+      OffsetDateTime nextChargeAt,
       OffsetDateTime overrideEndsAt,
       List<String> availablePaymentMethods,
       boolean canCheckout,
@@ -48,7 +52,9 @@ public interface BillingAccountMapper {
   @Mapping(target = "currentPeriodEnd", expression = "java(null)")
   @Mapping(target = "cancelAtPeriodEnd", constant = "false")
   @Mapping(target = "currentPlan", expression = "java(null)")
+  @Mapping(target = "scheduledPlan", expression = "java(null)")
   @Mapping(target = "pendingPlan", expression = "java(null)")
+  @Mapping(target = "nextChargeAt", expression = "java(null)")
   @Mapping(target = "overrideEndsAt", expression = "java(null)")
   @Mapping(target = "availablePaymentMethods", source = "availablePaymentMethods")
   @Mapping(target = "canCheckout", constant = "false")

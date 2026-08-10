@@ -45,6 +45,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -170,11 +171,18 @@ public class ReadingService {
   @Transactional
   public ReadingResponse update(UUID owner, UUID id, UpdateReadingRequest request, String locale) {
     access.requireAccess(owner);
-    Reading reading = requireInProgress(owner, id);
-    ReadingDeckMode deckMode = reading.getDeckMode();
+    Reading reading = reading(owner, id);
     if (!request.any()) {
       throw badRequest("At least one field must be provided.");
     }
+    if ((request.spreadPresent() || request.deckPresent() || request.clientPresent())
+        && reading.getStatus() != ReadingStatus.IN_PROGRESS) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Only metadata can be edited after completion.");
+    }
+    if (request.startedAtPresent() && request.startedAt() == null) {
+      throw badRequest("startedAt cannot be null.");
+    }
+    ReadingDeckMode deckMode = reading.getDeckMode();
     if (request.deckPresent()) {
       if (request.deckMode() == null) {
         throw badRequest("deckMode cannot be null.");
@@ -200,6 +208,8 @@ public class ReadingService {
         trim(request.question()),
         request.contextPresent(),
         trim(request.context()),
+        request.startedAtPresent(),
+        request.startedAt(),
         now());
     return response(reading, locale);
   }
@@ -212,7 +222,7 @@ public class ReadingService {
       SaveReadingPositionRequest request,
       String locale) {
     access.requireAccess(owner);
-    Reading reading = requireInProgress(owner, readingId);
+    Reading reading = reading(owner, readingId);
     if ((request.cardId() == null) != (request.orientation() == null)) {
       throw badRequest("cardId and orientation must both be set or cleared.");
     }
@@ -220,10 +230,15 @@ public class ReadingService {
         && !List.of("UPRIGHT", "REVERSED").contains(request.orientation())) {
       throw badRequest("Invalid orientation.");
     }
-    validateCardForDeck(reading, request.cardId());
 
     ReadingPosition position = positions.findByIdAndReadingId(positionId, readingId)
         .orElseThrow(() -> notFound("Reading position not found."));
+    boolean cardChanging = !Objects.equals(request.cardId(), position.getCardId())
+        || !Objects.equals(request.orientation(), position.getOrientation());
+    if (cardChanging && reading.getStatus() != ReadingStatus.IN_PROGRESS) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Card assignment is locked after completion.");
+    }
+    validateCardForDeck(reading, request.cardId());
     if (request.cardId() != null
         && positions.existsByReadingIdAndCardIdAndIdNot(readingId, request.cardId(), positionId)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "A card can only be used once per reading.");

@@ -119,10 +119,15 @@ ASAAS_WEBHOOK_TOKEN
 ARKANA_RECONCILIATION_SECRET
 ```
 
-`BILLING_PROVIDER` accepts `ABACATEPAY` (the default) or `ASAAS` and selects
+`BILLING_PROVIDER` accepts `ASAAS` (the default) or `ABACATEPAY` and selects
 the provider only for new checkouts. The provider used to create a paid
 subscription is persisted, so cancellation, plan changes, and webhooks keep
 using that provider after a configuration change.
+
+During an active trial, Asaas can create a recurring card subscription with
+its first charge scheduled for `trialEndsAt`. The Arkana account remains
+`TRIALING` until a confirmed payment webhook arrives. AbacatePay remains
+available for legacy subscriptions but does not support this deferred checkout.
 
 Asaas uses its hosted recurring checkout with credit card only. Set
 `ASAAS_API_URL=https://api-sandbox.asaas.com/v3` for sandbox or

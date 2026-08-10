@@ -6,5 +6,6 @@ public record AsaasChangeSubscriptionRequest(
     BigDecimal value,
     String cycle,
     String description,
+    String nextDueDate,
     boolean updatePendingPayments) {
 }

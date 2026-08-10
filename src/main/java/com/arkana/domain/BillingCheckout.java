@@ -67,6 +67,14 @@ public class BillingCheckout {
     status = BillingCheckoutStatus.FAILED;
   }
 
+  public void schedule() {
+    status = BillingCheckoutStatus.SCHEDULED;
+  }
+
+  public void expire() {
+    status = BillingCheckoutStatus.FAILED;
+  }
+
   public void complete() {
     status = BillingCheckoutStatus.COMPLETED;
   }
