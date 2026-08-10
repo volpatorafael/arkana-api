@@ -1,12 +1,15 @@
 package com.arkana.integration.abacatepay;
 
 import com.arkana.domain.BillingPaymentMethod;
+import com.arkana.domain.BillingProviderEventType;
 import com.arkana.integration.PaymentProvider;
+import com.arkana.integration.dto.PaymentWebhookEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.JsonNode;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.Mac;
@@ -20,21 +23,11 @@ import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Component
+@Slf4j
 public class AbacatePayProvider implements PaymentProvider {
-  private static final Set<String> SUPPORTED_EVENTS = Set.of(
-      "subscription.trial_started",
-      "subscription.completed",
-      "subscription.renewed",
-      "subscription.payment_failed",
-      "subscription.cancelled",
-      "subscription.plan_changed");
-
   private final String apiKey;
   private final String hmacKey;
   private final String appUrl;
@@ -58,72 +51,90 @@ public class AbacatePayProvider implements PaymentProvider {
       String checkout,
       String product,
       BillingPaymentMethod method) {
-    LinkedHashMap<String, Object> body = new LinkedHashMap<>();
-    body.put("completionUrl", appUrl + "/app?billing=success");
-    body.put("returnUrl", appUrl + "/app?billing=return");
-    body.put("externalId", checkout);
-    body.put("items", List.of(Map.of("id", product, "quantity", 1)));
-    body.put("methods", List.of(method == BillingPaymentMethod.PIX_AUTOMATIC ? "PIX" : "CARD"));
-    body.put("metadata", Map.of("billingAccountId", account, "checkoutId", checkout));
-
-    JsonNode data = request("/subscriptions/create", body);
-    String id = text(data, "id");
-    String url = text(data, "url");
-    if (id == null || url == null) {
+    AbacatePayCreateSubscriptionRequest body = new AbacatePayCreateSubscriptionRequest(
+        appUrl + "/app?billing=success",
+        appUrl + "/app?billing=return",
+        checkout,
+        List.of(new AbacatePayCreateSubscriptionRequest.Item(product, 1)),
+        List.of(method == BillingPaymentMethod.PIX_AUTOMATIC ? "PIX" : "CARD"),
+        new AbacatePayCreateSubscriptionRequest.Metadata(account, checkout));
+    AbacatePayCreateSubscriptionResponse response = request(
+        "/subscriptions/create",
+        body,
+        new TypeReference<>() {
+        });
+    if (response == null || response.id() == null || response.url() == null) {
+      log.error(
+          "AbacatePay returned an incomplete checkout. providerIdPresent={}, urlPresent={}, expiresAt={}",
+          response != null && response.id() != null,
+          response != null && response.url() != null,
+          response == null ? null : response.expiresAt());
       throw unavailable("AbacatePay returned an incomplete checkout.");
     }
-    String expiry = text(data, "expiresAt");
-    OffsetDateTime expiresAt = expiry == null
+    OffsetDateTime expiresAt = response.expiresAt() == null
         ? OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30)
-        : OffsetDateTime.parse(expiry);
-    return new Checkout(id, url, expiresAt);
+        : response.expiresAt();
+    return new Checkout(response.id(), response.url(), expiresAt);
   }
 
   @Override
   public void cancel(String id) {
-    request("/subscriptions/cancel", Map.of("id", id));
+    request(
+        "/subscriptions/cancel",
+        new AbacatePaySubscriptionRequest(id),
+        new TypeReference<AbacatePayApiResponse<Object>>() {
+        });
   }
 
   @Override
   public void changePlan(String id, String product) {
-    request("/subscriptions/change-plan", Map.of("id", id, "productId", product, "quantity", 1));
+    request(
+        "/subscriptions/change-plan",
+        new AbacatePayChangePlanRequest(id, product, 1),
+        new TypeReference<AbacatePayApiResponse<Object>>() {
+        });
   }
 
   @Override
-  public Map<String, Object> verifyWebhook(byte[] raw, String signature) {
+  public PaymentWebhookEvent verifyWebhook(byte[] raw, String signature) {
     if (hmacKey.isBlank()) {
+      log.error("AbacatePay webhook validation failed because the HMAC key is not configured.");
       throw unavailable("AbacatePay webhook is not configured.");
     }
     try {
       verifySignature(raw, signature);
 
-      JsonNode root = json.readTree(raw);
-      String id = text(root, "id");
-      String event = text(root, "event");
-      if (id == null || event == null || !SUPPORTED_EVENTS.contains(event)) {
+      AbacatePayWebhookRequest webhook = json.readValue(raw, AbacatePayWebhookRequest.class);
+      BillingProviderEventType eventType = BillingProviderEventType
+          .fromEventValue(webhook.event())
+          .orElseThrow(() -> new ResponseStatusException(
+              HttpStatus.BAD_REQUEST,
+              "Invalid webhook event."));
+      if (webhook.id() == null || webhook.id().isBlank()) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook event.");
       }
 
-      JsonNode data = root.path("data");
-      JsonNode subscription = data.path("subscription");
-      JsonNode checkout = data.path("checkout");
-      JsonNode metadata = checkout.path("metadata");
-      LinkedHashMap<String, Object> normalized = new LinkedHashMap<>();
-      normalized.put("id", id);
-      normalized.put("event", event);
-      normalized.put("payload", new String(raw, StandardCharsets.UTF_8));
-      normalized.put("subscriptionId", text(subscription, "id"));
-      normalized.put(
-          "productId",
-          first(text(subscription, "productId"), text(subscription.path("product"), "id")));
-      normalized.put("checkoutId", first(text(checkout, "externalId"), text(metadata, "checkoutId")));
-      normalized.put("periodStart", date(subscription, "currentPeriodStart"));
-      normalized.put("periodEnd", firstDate(subscription, "currentPeriodEnd", "nextBillingAt"));
-      normalized.put("trialEnd", date(subscription, "trialEndsAt"));
-      return normalized;
+      AbacatePayWebhookRequest.Data data = webhook.data();
+      AbacatePayWebhookRequest.Subscription subscription = data == null ? null : data.subscription();
+      AbacatePayWebhookRequest.Checkout checkout = data == null ? null : data.checkout();
+      return new PaymentWebhookEvent(
+          webhook.id(),
+          eventType,
+          new String(raw, StandardCharsets.UTF_8),
+          subscription == null ? null : subscription.id(),
+          productId(subscription),
+          checkoutId(checkout),
+          subscription == null ? null : subscription.currentPeriodStart(),
+          periodEnd(subscription),
+          subscription == null ? null : subscription.trialEndsAt());
     } catch (ResponseStatusException exception) {
+      log.error(
+          "AbacatePay webhook was rejected. status={}, reason={}",
+          exception.getStatusCode(),
+          exception.getReason());
       throw exception;
     } catch (Exception exception) {
+      log.error("Failed to parse an AbacatePay webhook after signature validation.", exception);
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid webhook event.");
     }
   }
@@ -138,8 +149,12 @@ public class AbacatePayProvider implements PaymentProvider {
     }
   }
 
-  private JsonNode request(String path, Object body) {
+  private <T> T request(
+      String path,
+      Object body,
+      TypeReference<AbacatePayApiResponse<T>> responseType) {
     if (apiKey.isBlank()) {
+      log.error("AbacatePay request could not be sent because the API key is not configured. path={}", path);
       throw unavailable("AbacatePay is not configured.");
     }
     try {
@@ -149,35 +164,73 @@ public class AbacatePayProvider implements PaymentProvider {
           .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
           .build();
       HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-      JsonNode root = json.readTree(response.body());
-      if (response.statusCode() >= 300 || !root.path("error").isMissingNode()) {
+      if (response.statusCode() >= 300) {
+        log.error(
+            "AbacatePay request was rejected. path={}, status={}, responseBody={}",
+            path,
+            response.statusCode(),
+            response.body());
         throw unavailable("AbacatePay rejected the operation.");
       }
-      return root.path("data");
+      AbacatePayApiResponse<T> providerResponse;
+      try {
+        providerResponse = json.readValue(response.body(), responseType);
+      } catch (Exception exception) {
+        log.error(
+            "Could not parse AbacatePay response. path={}, status={}, responseBody={}",
+            path,
+            response.statusCode(),
+            response.body(),
+            exception);
+        throw unavailable("AbacatePay returned an invalid response.");
+      }
+      if (providerResponse.error() != null) {
+        log.error(
+            "AbacatePay returned an application error. path={}, status={}, responseBody={}",
+            path,
+            response.statusCode(),
+            response.body());
+        throw unavailable("AbacatePay rejected the operation.");
+      }
+      return providerResponse.data();
     } catch (ResponseStatusException exception) {
       throw exception;
     } catch (Exception exception) {
+      log.error("AbacatePay request failed. path={}", path, exception);
       throw unavailable("AbacatePay request failed.");
     }
-  }
-
-  private String text(JsonNode node, String field) {
-    JsonNode value = node.path(field);
-    return value.isTextual() && !value.asText().isBlank() ? value.asText() : null;
   }
 
   private String first(String left, String right) {
     return left != null ? left : right;
   }
 
-  private OffsetDateTime date(JsonNode node, String field) {
-    String value = text(node, field);
-    return value == null ? null : OffsetDateTime.parse(value);
+  private String productId(AbacatePayWebhookRequest.Subscription subscription) {
+    if (subscription == null) {
+      return null;
+    }
+    return first(
+        subscription.productId(),
+        subscription.product() == null ? null : subscription.product().id());
   }
 
-  private OffsetDateTime firstDate(JsonNode node, String first, String second) {
-    OffsetDateTime value = date(node, first);
-    return value != null ? value : date(node, second);
+  private String checkoutId(AbacatePayWebhookRequest.Checkout checkout) {
+    if (checkout == null) {
+      return null;
+    }
+    return first(
+        checkout.externalId(),
+        checkout.metadata() == null ? null : checkout.metadata().checkoutId());
+  }
+
+  private OffsetDateTime periodEnd(AbacatePayWebhookRequest.Subscription subscription) {
+    return subscription == null
+        ? null
+        : first(subscription.currentPeriodEnd(), subscription.nextBillingAt());
+  }
+
+  private OffsetDateTime first(OffsetDateTime left, OffsetDateTime right) {
+    return left != null ? left : right;
   }
 
   private ResponseStatusException unavailable(String message) {

@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260810-01-store-billing-provider-event-types-as-enum-names
+      author: arkana
+      changes:
+        - sql:
+            sql: >-
+              update billing_provider_events
+              set event_type = case event_type
+                when 'subscription.trial_started' then 'TRIAL_STARTED'
+                when 'subscription.completed' then 'COMPLETED'
+                when 'subscription.renewed' then 'RENEWED'
+                when 'subscription.payment_failed' then 'PAYMENT_FAILED'
+                when 'subscription.cancelled' then 'CANCELED'
+                when 'subscription.plan_changed' then 'PLAN_CHANGED'
+                else event_type
+              end
+              where event_type in (
+                'subscription.trial_started',
+                'subscription.completed',
+                'subscription.renewed',
+                'subscription.payment_failed',
+                'subscription.cancelled',
+                'subscription.plan_changed'
+              )

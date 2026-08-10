@@ -12,6 +12,7 @@ import com.arkana.domain.BillingPromotionEligibility;
 import com.arkana.domain.BillingPromotionEligibilityStatus;
 import com.arkana.domain.BillingProvider;
 import com.arkana.domain.BillingProviderEvent;
+import com.arkana.domain.BillingProviderEventType;
 import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
 import com.arkana.domain.Profile;
@@ -24,6 +25,7 @@ import com.arkana.dto.billing.CreateBillingCheckoutRequest;
 import com.arkana.dto.billing.SubscriptionPlanResponse;
 import com.arkana.dto.billing.PlanPromotionResponse;
 import com.arkana.integration.PaymentProvider;
+import com.arkana.integration.dto.PaymentWebhookEvent;
 import com.arkana.mapper.BillingAccountMapper;
 import com.arkana.mapper.BillingCheckoutMapper;
 import com.arkana.mapper.BillingPlanPriceMapper;
@@ -264,39 +266,41 @@ public class BillingService {
 
   @Transactional
   public void webhook(byte[] raw, String signature) {
-    Map<String, Object> event = provider.verifyWebhook(raw, signature);
-    String eventId = (String) event.get("id");
+    PaymentWebhookEvent event = provider.verifyWebhook(raw, signature);
+    String eventId = event.id();
     if (providerEvents.existsByProviderAndProviderEventId(PAYMENT_PROVIDER, eventId)) {
       return;
     }
 
+    BillingProviderEventType eventType = event.eventType();
     BillingProviderEvent providerEvent = providerEvents.save(BillingProviderEvent.builder()
         .id(UUID.randomUUID())
         .provider(PAYMENT_PROVIDER)
         .providerEventId(eventId)
-        .eventType((String) event.get("event"))
+        .eventType(eventType)
         .processingStatus("RECEIVED")
-        .rawPayload(String.valueOf(event.get("payload")))
+        .rawPayload(event.rawPayload())
         .build());
     WebhookContext context = webhookContext(
-        (String) event.get("checkoutId"),
-        (String) event.get("subscriptionId"));
+        event.checkoutId(),
+        event.subscriptionId(),
+        event.productId(),
+        eventType == BillingProviderEventType.PLAN_CHANGED);
     if (context == null) {
       providerEvent.ignore();
       return;
     }
 
-    String eventType = (String) event.get("event");
     BillingAccountStatus status = switch (eventType) {
-      case "subscription.completed", "subscription.renewed", "subscription.plan_changed" ->
+      case COMPLETED, RENEWED, PLAN_CHANGED ->
           BillingAccountStatus.ACTIVE;
-      case "subscription.payment_failed" -> BillingAccountStatus.PAST_DUE;
-      case "subscription.cancelled" -> BillingAccountStatus.CANCELED;
+      case PAYMENT_FAILED -> BillingAccountStatus.PAST_DUE;
+      case CANCELED -> BillingAccountStatus.CANCELED;
       default -> BillingAccountStatus.TRIALING;
     };
-    OffsetDateTime periodStart = (OffsetDateTime) event.get("periodStart");
-    OffsetDateTime periodEnd = (OffsetDateTime) event.get("periodEnd");
-    OffsetDateTime trialEnd = (OffsetDateTime) event.get("trialEnd");
+    OffsetDateTime periodStart = event.periodStart();
+    OffsetDateTime periodEnd = event.periodEnd();
+    OffsetDateTime trialEnd = event.trialEnd();
     if (status == BillingAccountStatus.ACTIVE && periodEnd == null) {
       periodStart = periodStart == null ? now() : periodStart;
       periodEnd = "YEAR".equals(context.interval())
@@ -340,8 +344,8 @@ public class BillingService {
     }
   }
 
-  private void updateProviderSubscription(Map<String, Object> event, UUID accountId) {
-    String subscriptionId = (String) event.get("subscriptionId");
+  private void updateProviderSubscription(PaymentWebhookEvent event, UUID accountId) {
+    String subscriptionId = event.subscriptionId();
     if (subscriptionId == null) {
       return;
     }
@@ -386,7 +390,11 @@ public class BillingService {
             "No active provider subscription exists."));
   }
 
-  private WebhookContext webhookContext(String checkoutId, String subscriptionId) {
+  private WebhookContext webhookContext(
+      String checkoutId,
+      String subscriptionId,
+      String providerProductId,
+      boolean requireMappedProduct) {
     if (checkoutId != null) {
       try {
         Optional<BillingCheckout> checkout = checkouts.findById(UUID.fromString(checkoutId));
@@ -411,7 +419,18 @@ public class BillingService {
     return subscriptions.findByProviderAndProviderSubscriptionId(PAYMENT_PROVIDER, subscriptionId)
         .map(subscription -> {
           BillingAccount account = accounts.findById(subscription.getBillingAccountId()).orElseThrow();
-          UUID planId = account.getCurrentPlanPriceId();
+          UUID planId = providerProductId == null
+              ? account.getCurrentPlanPriceId()
+              : planMappings.findByProviderAndProviderProductId(PAYMENT_PROVIDER, providerProductId)
+              .map(BillingProviderPlanMapping::getPlanPriceId)
+              .orElseGet(() -> {
+                if (requireMappedProduct) {
+                  throw new ResponseStatusException(
+                      HttpStatus.SERVICE_UNAVAILABLE,
+                      "The provider plan is not configured.");
+                }
+                return account.getCurrentPlanPriceId();
+              });
           String interval = planId == null
               ? null
               : plans.findById(planId)

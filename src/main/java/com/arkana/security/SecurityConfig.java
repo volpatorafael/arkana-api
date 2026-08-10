@@ -87,7 +87,7 @@ public class SecurityConfig {
     configuration.setAllowedHeaders(List.of(
         HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT,
         "Idempotency-Key", "X-Webhook-Signature"));
-    configuration.setExposedHeaders(List.of("X-Request-Id"));
+    configuration.setExposedHeaders(List.of("X-Request-Id", "X-API-Version"));
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;

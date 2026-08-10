@@ -33,7 +33,8 @@ public class BillingProviderEvent {
   @Column(name = "provider_event_id", nullable = false, length = 200)
   private String providerEventId;
   @Column(name = "event_type", nullable = false, length = 160)
-  private String eventType;
+  @Enumerated(EnumType.STRING)
+  private BillingProviderEventType eventType;
   @Column(name = "processing_status", nullable = false, length = 16)
   private String processingStatus;
   @Column(name = "raw_payload", nullable = false, length = 100000)

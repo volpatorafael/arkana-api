@@ -96,10 +96,11 @@ class PaymentIntegrationControllerIT extends BaseControllerIT {
 
     private String payload(String eventId, UUID checkoutId, OffsetDateTime now) {
         return "{\"id\":\"" + eventId
-            + "\",\"event\":\"subscription.completed\",\"data\":{\"subscription\":{\"id\":\"subscription-"
+            + "\",\"event\":\"subscription.completed\",\"ignoredRoot\":true,\"data\":{\"subscription\":{\"id\":\"subscription-"
             + eventId + "\",\"currentPeriodStart\":\"" + now
             + "\",\"currentPeriodEnd\":\"" + now.plusMonths(1)
-            + "\"},\"checkout\":{\"externalId\":\"" + checkoutId + "\"}}}";
+            + "\",\"ignoredSubscription\":true},\"checkout\":{\"externalId\":\""
+            + checkoutId + "\",\"ignoredCheckout\":true}}}";
     }
 
     private String hmac(String payload, String key) throws Exception {

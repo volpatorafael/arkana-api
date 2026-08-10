@@ -1,9 +1,9 @@
 package com.arkana.integration;
 
 import com.arkana.domain.BillingPaymentMethod;
+import com.arkana.integration.dto.PaymentWebhookEvent;
 
 import java.time.OffsetDateTime;
-import java.util.Map;
 
 public interface PaymentProvider {
   Checkout createCheckout(
@@ -16,8 +16,9 @@ public interface PaymentProvider {
 
   void changePlan(String subscriptionId, String productId);
 
-  Map<String, Object> verifyWebhook(byte[] rawBody, String signature);
+  PaymentWebhookEvent verifyWebhook(byte[] rawBody, String signature);
 
   record Checkout(String providerId, String url, OffsetDateTime expiresAt) {
   }
+
 }

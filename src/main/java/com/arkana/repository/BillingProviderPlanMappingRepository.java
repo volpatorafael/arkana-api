@@ -11,4 +11,8 @@ public interface BillingProviderPlanMappingRepository extends JpaRepository<Bill
   Optional<BillingProviderPlanMapping> findByPlanPriceIdAndProvider(
       UUID planPriceId,
       BillingProvider provider);
+
+  Optional<BillingProviderPlanMapping> findByProviderAndProviderProductId(
+      BillingProvider provider,
+      String providerProductId);
 }

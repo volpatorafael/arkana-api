@@ -21,6 +21,7 @@ class BillingPlansControllerIT extends BaseControllerIT {
             .andExpect(header().string(
                 "Cache-Control",
                 "public, max-age=60, s-maxage=60, stale-while-revalidate=60"))
+            .andExpect(header().string("X-API-Version", "snapshot"))
             .andExpect(jsonPath("$", hasSize(2)))
             .andExpect(jsonPath("$[0].id").isNotEmpty())
             .andExpect(jsonPath("$[0].code").isString())

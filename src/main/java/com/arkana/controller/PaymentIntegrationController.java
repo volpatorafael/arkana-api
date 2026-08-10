@@ -1,5 +1,6 @@
 package com.arkana.controller;
 
+import com.arkana.dto.billing.WebhookAcceptedResponse;
 import com.arkana.service.BillingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -13,8 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Map;
-
 @RestController
 @RequestMapping("/v1")
 public class PaymentIntegrationController {
@@ -29,13 +28,13 @@ public class PaymentIntegrationController {
   }
 
   @PostMapping("/webhook/payment/abacatepay")
-  Map<String, Boolean> webhook(
+  WebhookAcceptedResponse webhook(
       @RequestParam String webhookSecret,
       @RequestHeader("X-Webhook-Signature") String signature,
       @RequestBody byte[] raw) {
     requireSecret(this.webhookSecret, webhookSecret);
     billing.webhook(raw, signature);
-    return Map.of("accepted", true);
+    return new WebhookAcceptedResponse(true);
   }
 
   private void requireSecret(String expected, String supplied) {
