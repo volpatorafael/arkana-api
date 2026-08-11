@@ -46,6 +46,7 @@ arkana:
     charges-url: ${EFI_CHARGES_URL:https://cobrancas-h.api.efipay.com.br}
     pix-url: ${EFI_PIX_URL:https://pix-h.api.efipay.com.br}
     pix-key: ${EFI_PIX_KEY:}
+    pix-automatic-enabled: ${EFI_PIX_AUTOMATIC_ENABLED:false}
     certificate-path: ${EFI_CERTIFICATE_PATH:}
     certificate-password: ${EFI_CERTIFICATE_PASSWORD:}
     charges-webhook-secret: ${EFI_CHARGES_WEBHOOK_SECRET:}

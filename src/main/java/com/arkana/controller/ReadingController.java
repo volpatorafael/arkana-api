@@ -49,8 +49,10 @@ public class ReadingController {
       @RequestParam(required = false)
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
       @RequestParam(required = false)
-      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to) {
-    return readings.list(currentUser.id(jwt), page, pageSize, archived, clientId, status, from, to);
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
+      @RequestParam(required = false) String locale) {
+    return readings.list(
+        currentUser.id(jwt), page, pageSize, archived, clientId, status, from, to, locale);
   }
 
   @PostMapping

@@ -69,6 +69,7 @@ class ReadingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.items[0].clientId").value(firstClient.getId().toString()))
             .andExpect(jsonPath("$.items[0].readingShareId").isEmpty())
             .andExpect(jsonPath("$.items[0].spreadId").value("advice"))
+            .andExpect(jsonPath("$.items[0].spreadName").value("Carta Conselho"))
             .andExpect(jsonPath("$.items[0].deckMode").value("MAJOR"))
             .andExpect(jsonPath("$.items[0].status").value("IN_PROGRESS"))
             .andExpect(jsonPath("$.items[0].title").value(firstReading.getTitle()))
@@ -111,6 +112,7 @@ class ReadingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.clientId").value(firstClient.getId().toString()))
             .andExpect(jsonPath("$.readingShareId").isEmpty())
             .andExpect(jsonPath("$.spreadId").value("advice"))
+            .andExpect(jsonPath("$.spreadName").value("Carta Conselho"))
             .andExpect(jsonPath("$.deckMode").value("MAJOR"))
             .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
             .andExpect(jsonPath("$.title").isEmpty())
@@ -152,6 +154,22 @@ class ReadingControllerIT extends BaseControllerIT {
                     + "\",\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\"}")),
             "Client not found.");
         assertThat(readingRepository.count()).isEqualTo(countBeforeForeignAttempt);
+    }
+
+    @Test
+    void shouldLocalizeSpreadNameInReadingListAndDetail() throws Exception {
+        Reading reading = reading(firstUser);
+
+        mockMvcPerform(get("/v1/readings?locale=en").with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].spreadId").value("advice"))
+            .andExpect(jsonPath("$.items[0].spreadName").value("Advice Card"));
+
+        mockMvcPerform(get("/v1/readings/{id}?locale=en", reading.getId())
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.spreadId").value("advice"))
+            .andExpect(jsonPath("$.spreadName").value("Advice Card"));
     }
 
     @Test

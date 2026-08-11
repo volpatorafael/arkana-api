@@ -132,6 +132,7 @@ certificate or URL.
 | `EFI_CHARGES_URL`            | Fixed production route: `https://cobrancas.api.efipay.com.br`. |
 | `EFI_PIX_URL`                | Fixed production route: `https://pix.api.efipay.com.br`. |
 | *`EFI_PIX_KEY`               | Efí: copy the receiving key registered for the Arkana account from `Pix > Minhas chaves`. Copy the key itself, not a QR Code or location ID. |
+| `EFI_PIX_AUTOMATIC_ENABLED`  | Use `false` to offer only credit card. Change to `true` only when Pix Automático is ready for customers. |
 | *`EFI_CERTIFICATE_PATH`      | A path chosen by Arkana inside the API container. Mount the production P12 at `/app/secrets/efi-production.p12` and use that exact path. This value is not shown by Efí. |
 | `EFI_CERTIFICATE_PASSWORD`   | The password of the P12. Leave it empty only when the downloaded P12 has no password. This is not the Efí account password. |
 | `EFI_CHARGES_WEBHOOK_SECRET` | Generate locally with `openssl rand -hex 32`. Efí does not provide it. Use a different generated value for each webhook variable. |
@@ -200,6 +201,7 @@ EFI_PIX_URL=https://pix.api.efipay.com.br
 
 # Pix key and mounted production certificate.
 EFI_PIX_KEY=REPLACE_WITH_PIX_KEY
+EFI_PIX_AUTOMATIC_ENABLED=false
 EFI_CERTIFICATE_PATH=/app/secrets/efi-production.p12
 EFI_CERTIFICATE_PASSWORD=
 

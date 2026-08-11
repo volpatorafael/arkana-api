@@ -124,8 +124,10 @@ public class ReadingService {
       UUID clientId,
       String status,
       OffsetDateTime from,
-      OffsetDateTime to) {
+      OffsetDateTime to,
+      String locale) {
     access.requireAccess(owner);
+    String normalizedLocale = locale(locale);
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       throw badRequest("Invalid pagination.");
     }
@@ -159,9 +161,13 @@ public class ReadingService {
         Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id")));
     Page<Reading> result = readings.findAll(specification, pageable);
     Map<UUID, UUID> shareIds = activeShareIds(result.getContent(), now());
+    Map<String, String> spreadNames = spreadNames(result.getContent(), normalizedLocale);
     return mapper.toPage(
         result.getContent().stream()
-            .map(reading -> mapper.toSummary(reading, shareIds.get(reading.getId())))
+            .map(reading -> mapper.toSummary(
+                reading,
+                shareIds.get(reading.getId()),
+                spreadNames.get(reading.getSpreadId())))
             .toList(),
         page,
         pageSize,
@@ -427,6 +433,7 @@ public class ReadingService {
   }
 
   private ReadingResponse response(Reading reading, String locale) {
+    String normalizedLocale = locale(locale);
     UUID readingShareId = shares.findFirstByReading_IdAndStatusAndExpiresAtAfter(
             reading.getId(),
             ReadingShareStatus.ACTIVE,
@@ -446,13 +453,29 @@ public class ReadingService {
         .map(position -> positionMapper.toResponse(
             position,
             cardsById.get(position.getCardId()),
-            locale))
+            normalizedLocale))
         .toList();
     return mapper.toResponse(
         reading,
         readingShareId,
-        spreadMapper.toSummaryResponse(spread, locale),
+        spreadMapper.toSummaryResponse(spread, normalizedLocale),
         positionResponses);
+  }
+
+  private Map<String, String> spreadNames(List<Reading> page, String locale) {
+    return spreads.findAllById(page.stream().map(Reading::getSpreadId).distinct().toList())
+        .stream()
+        .collect(Collectors.toMap(
+            Spread::getId,
+            spread -> spreadMapper.toSummaryResponse(spread, locale).name()));
+  }
+
+  private String locale(String locale) {
+    String value = locale == null ? "pt-BR" : locale;
+    if (!value.equals("pt-BR") && !value.equals("en")) {
+      throw badRequest("locale must be pt-BR or en.");
+    }
+    return value;
   }
 
   private Map<UUID, UUID> activeShareIds(

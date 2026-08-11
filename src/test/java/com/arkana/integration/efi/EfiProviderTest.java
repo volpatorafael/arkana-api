@@ -35,14 +35,18 @@ class EfiProviderTest {
   private HttpServer server;
   private EfiProvider provider;
   private AtomicInteger oauthRequests;
+  private AtomicInteger cancellationRequests;
   private AtomicReference<String> subscriptionBody;
   private boolean rejectSubscription;
+  private boolean refuseCard;
 
   @BeforeEach
   void setUp() throws IOException {
     oauthRequests = new AtomicInteger();
+    cancellationRequests = new AtomicInteger();
     subscriptionBody = new AtomicReference<>();
     rejectSubscription = false;
+    refuseCard = false;
     server = HttpServer.create(new InetSocketAddress(0), 0);
     server.createContext("/", this::respond);
     server.start();
@@ -53,6 +57,7 @@ class EfiProviderTest {
         baseUrl,
         baseUrl,
         "pix-key",
+        false,
         "",
         "",
         "charges-secret",
@@ -69,15 +74,19 @@ class EfiProviderTest {
 
   @Test
   void shouldCreateCardSubscriptionWithTrialAndReuseOAuthToken() {
+    assertThat(provider.supportedPaymentMethods()).containsExactly(BillingPaymentMethod.CARD);
+
     PaymentProvider.Checkout checkout = provider.createCheckout(command(BillingPaymentMethod.CARD));
 
     assertThat(checkout.actionType()).isEqualTo(PaymentProvider.ActionType.PENDING_CONFIRMATION);
     assertThat(checkout.subscriptionId()).isEqualTo("subscription-123");
     assertThat(subscriptionBody.get())
         .contains("\"payment_token\":\"browser-token\"")
+        .contains("\"email\":\"reader@example.com\"")
         .contains("\"trial_days\":14")
         .contains("\"custom_id\":\"checkout-id\"")
-        .contains("/v1/webhook/payment/efi/charges?webhookSecret=charges-secret");
+        .contains("/v1/webhook/payment/efi/charges?webhookSecret=charges-secret")
+        .doesNotContain("reader+e2e@example.com");
 
     PaymentWebhookEvent event = provider.verifyWebhook(
         "notification-token".getBytes(StandardCharsets.UTF_8),
@@ -110,6 +119,17 @@ class EfiProviderTest {
   }
 
   @Test
+  void shouldCancelRemoteSubscriptionAndRejectAnUnpaidCard() {
+    refuseCard = true;
+
+    assertThatThrownBy(() -> provider.createCheckout(command(BillingPaymentMethod.CARD)))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("The card was declined")
+        .hasMessageNotContaining("security analysis");
+    assertThat(cancellationRequests).hasValue(1);
+  }
+
+  @Test
   void shouldExposeUsefulSafeMessageAndLogCompleteProviderResponse(CapturedOutput output) {
     rejectSubscription = true;
 
@@ -134,7 +154,7 @@ class EfiProviderTest {
     return new PaymentProvider.CreateCheckout(
         "account-id",
         "checkout-id",
-        "reader@example.com",
+        "reader+e2e@example.com",
         method,
         new PaymentProvider.Plan(
             "plan-id", "ARKANA_MONTHLY", "Arkana Mensal", "MONTH", 4900, "BRL", "42"),
@@ -163,10 +183,17 @@ class EfiProviderTest {
             + "\"error_description\":{"
             + "\"property\":\"/payment/credit_card/trial_days\","
             + "\"message\":\"Propriedade desconhecida (não está no schema).\"}}";
+      } else if (refuseCard) {
+        response = "{\"data\":{\"subscription_id\":\"subscription-refused\","
+            + "\"charge\":{\"id\":\"charge-refused\",\"status\":\"unpaid\","
+            + "\"refusal\":{\"reason\":\"security analysis\",\"retry\":false}}}}";
       } else {
         response = "{\"data\":{\"subscription_id\":\"subscription-123\","
             + "\"charge\":{\"id\":\"charge-123\"}}}";
       }
+    } else if (path.equals("/v1/subscription/subscription-refused/cancel")) {
+      cancellationRequests.incrementAndGet();
+      response = "{\"code\":200}";
     } else if (path.equals("/v1/notification/notification-token")) {
       response = "{\"data\":[{\"id\":\"history-1\",\"type\":\"charge\","
           + "\"status\":{\"current\":\"waiting\"}},{\"id\":\"history-2\","

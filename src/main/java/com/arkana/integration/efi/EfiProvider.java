@@ -47,6 +47,7 @@ public class EfiProvider implements PaymentProvider {
   private final String chargesUrl;
   private final String pixUrl;
   private final String pixKey;
+  private final boolean pixAutomaticEnabled;
   private final String certificatePath;
   private final String certificatePassword;
   private final String chargesWebhookSecret;
@@ -65,6 +66,7 @@ public class EfiProvider implements PaymentProvider {
       @Value("${arkana.efi.charges-url:https://cobrancas-h.api.efipay.com.br}") String chargesUrl,
       @Value("${arkana.efi.pix-url:https://pix-h.api.efipay.com.br}") String pixUrl,
       @Value("${arkana.efi.pix-key:}") String pixKey,
+      @Value("${arkana.efi.pix-automatic-enabled:false}") boolean pixAutomaticEnabled,
       @Value("${arkana.efi.certificate-path:}") String certificatePath,
       @Value("${arkana.efi.certificate-password:}") String certificatePassword,
       @Value("${arkana.efi.charges-webhook-secret:}") String chargesWebhookSecret,
@@ -77,6 +79,7 @@ public class EfiProvider implements PaymentProvider {
     this.chargesUrl = trimSlash(chargesUrl);
     this.pixUrl = trimSlash(pixUrl);
     this.pixKey = pixKey;
+    this.pixAutomaticEnabled = pixAutomaticEnabled;
     this.certificatePath = certificatePath;
     this.certificatePassword = certificatePassword;
     this.chargesWebhookSecret = chargesWebhookSecret;
@@ -94,7 +97,9 @@ public class EfiProvider implements PaymentProvider {
 
   @Override
   public Set<BillingPaymentMethod> supportedPaymentMethods() {
-    return Set.of(BillingPaymentMethod.CARD, BillingPaymentMethod.PIX_AUTOMATIC);
+    return pixAutomaticEnabled
+        ? Set.of(BillingPaymentMethod.CARD, BillingPaymentMethod.PIX_AUTOMATIC)
+        : Set.of(BillingPaymentMethod.CARD);
   }
 
   @Override
@@ -209,6 +214,12 @@ public class EfiProvider implements PaymentProvider {
         "/v1/plan/" + encode(command.plan().providerProductId()) + "/subscription/one-step",
         body));
     String subscriptionId = requiredText(data, "subscription_id");
+    if ("unpaid".equals(data.path("charge").path("status").asText())) {
+      cancelRejectedCardSubscription(subscriptionId);
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "The card was declined. Check the card details or use another card.");
+    }
     String chargeId = data.path("charge").path("id").asText(subscriptionId);
     return new Checkout(
         chargeId,
@@ -218,6 +229,20 @@ public class EfiProvider implements PaymentProvider {
         null,
         null,
         OffsetDateTime.now(clock).plusMinutes(30));
+  }
+
+  private void cancelRejectedCardSubscription(String subscriptionId) {
+    try {
+      requestCharges(
+          "PUT",
+          "/v1/subscription/" + encode(subscriptionId) + "/cancel",
+          Map.of());
+    } catch (RuntimeException exception) {
+      log.error(
+          "Could not cancel an Efí subscription created from a refused card. subscriptionId={}",
+          subscriptionId,
+          exception);
+    }
   }
 
   private Checkout createPixSubscription(CreateCheckout command) {
@@ -536,8 +561,16 @@ public class EfiProvider implements PaymentProvider {
     return Map.of(
         "name", command.payer().name(),
         "cpf", command.payer().document(),
-        "email", command.email(),
+        "email", efiEmail(command.email()),
         "phone_number", command.payer().phoneNumber());
+  }
+
+  private String efiEmail(String email) {
+    int at = email.lastIndexOf('@');
+    int plus = email.indexOf('+');
+    return plus >= 0 && plus < at
+        ? email.substring(0, plus) + email.substring(at)
+        : email;
   }
 
   private Map<String, Object> address(Payer payer) {

@@ -15,10 +15,15 @@ import java.util.UUID;
 @Mapper
 public interface ReadingMapper {
   @Mapping(target = "readingShareId", source = "readingShareId")
-  ReadingSummaryResponse toSummary(Reading reading, UUID readingShareId);
+  @Mapping(target = "spreadName", source = "spreadName")
+  ReadingSummaryResponse toSummary(
+      Reading reading,
+      UUID readingShareId,
+      String spreadName);
 
   @Mapping(target = "readingShareId", source = "readingShareId")
   @Mapping(target = "id", source = "reading.id")
+  @Mapping(target = "spreadName", source = "spread.name")
   @Mapping(target = "spread", source = "spread")
   @Mapping(target = "positions", source = "positions")
   ReadingResponse toResponse(

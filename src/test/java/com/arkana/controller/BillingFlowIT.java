@@ -22,7 +22,6 @@ import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
@@ -42,8 +41,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@TestPropertySource(properties =
-    "spring.datasource.url=jdbc:h2:mem:arkana-billing-flow;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1")
 class BillingFlowIT extends BaseControllerIT {
     private static final UUID MONTHLY_PLAN_ID =
         UUID.fromString("30000000-0000-0000-0000-000000000001");
