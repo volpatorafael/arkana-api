@@ -91,8 +91,18 @@ class EfiProviderTest {
     PaymentWebhookEvent event = provider.verifyWebhook(
         "notification-token".getBytes(StandardCharsets.UTF_8),
         "charges-secret");
+    PaymentWebhookEvent repeatedEvent = provider.verifyWebhook(
+        "notification-token".getBytes(StandardCharsets.UTF_8),
+        "charges-secret");
+    PaymentWebhookEvent sameHistoryIdFromAnotherNotification = provider.verifyWebhook(
+        "another-notification-token".getBytes(StandardCharsets.UTF_8),
+        "charges-secret");
     assertThat(oauthRequests).hasValue(1);
-    assertThat(event.id()).isEqualTo("charges:history-2");
+    assertThat(event.id())
+        .startsWith("charges:")
+        .hasSize("charges:".length() + 64)
+        .isEqualTo(repeatedEvent.id())
+        .isNotEqualTo(sameHistoryIdFromAnotherNotification.id());
     assertThat(event.eventType()).isEqualTo(BillingProviderEventType.COMPLETED);
     assertThat(event.subscriptionId()).isEqualTo("subscription-123");
     assertThat(event.rawPayload()).doesNotContain("cpf", "phone", "payment_token");
@@ -194,7 +204,8 @@ class EfiProviderTest {
     } else if (path.equals("/v1/subscription/subscription-refused/cancel")) {
       cancellationRequests.incrementAndGet();
       response = "{\"code\":200}";
-    } else if (path.equals("/v1/notification/notification-token")) {
+    } else if (path.equals("/v1/notification/notification-token")
+        || path.equals("/v1/notification/another-notification-token")) {
       response = "{\"data\":[{\"id\":\"history-1\",\"type\":\"charge\","
           + "\"status\":{\"current\":\"waiting\"}},{\"id\":\"history-2\","
           + "\"type\":\"charge\",\"status\":{\"current\":\"paid\"},"

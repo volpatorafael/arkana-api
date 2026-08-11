@@ -313,8 +313,9 @@ public class EfiProvider implements PaymentProvider {
     String subscriptionId = entry.path("identifiers").path("subscription_id").asText(null);
     String chargeId = entry.path("identifiers").path("charge_id").asText(null);
     String checkoutId = entry.path("custom_id").asText(null);
+    String historyId = entry.path("id").asText(status);
     return new PaymentWebhookEvent(
-        "charges:" + entry.path("id").asText(token + ':' + status),
+        "charges:" + digest(token + ':' + historyId),
         eventType,
         sanitized("charges", type, status, subscriptionId, chargeId),
         subscriptionId,
