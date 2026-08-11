@@ -447,13 +447,19 @@ public class EfiProvider implements PaymentProvider {
       }
       HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() >= 300) {
+        ProviderError providerError = providerError(response.body());
         log.error(
-            "Efí request was rejected. api={}, path={}, status={}, providerRequestId={}",
+            "Efí request was rejected. api={}, path={}, status={}, providerCode={}, providerError={}, "
+                + "providerDescription={}, providerMessage={}, providerRequestId={}",
             pix ? "pix" : "charges",
             path,
             response.statusCode(),
+            providerError.code(),
+            providerError.error(),
+            providerError.description(),
+            providerError.message(),
             response.headers().firstValue("x-request-id").orElse(null));
-        throw unavailable("Efí rejected the operation.");
+        throw unavailable("Efí could not process the payment right now. Try again or contact support.");
       }
       return response.body() == null || response.body().isBlank()
           ? json.createObjectNode()
@@ -650,6 +656,38 @@ public class EfiProvider implements PaymentProvider {
     return URLEncoder.encode(value, StandardCharsets.UTF_8);
   }
 
+  private ProviderError providerError(String body) {
+    if (body == null || body.isBlank()) {
+      return ProviderError.EMPTY;
+    }
+    try {
+      JsonNode root = json.readTree(body);
+      JsonNode data = root.path("data");
+      return new ProviderError(
+          safeProviderValue(root, data, "code"),
+          safeProviderValue(root, data, "error"),
+          safeProviderValue(root, data, "error_description"),
+          safeProviderValue(root, data, "message"));
+    } catch (Exception ignored) {
+      return ProviderError.EMPTY;
+    }
+  }
+
+  private String safeProviderValue(JsonNode root, JsonNode data, String field) {
+    JsonNode value = root.path(field);
+    if (value.isMissingNode() || value.isNull() || value.isObject() || value.isArray()) {
+      value = data.path(field);
+    }
+    if (value.isMissingNode() || value.isNull() || value.isObject() || value.isArray()) {
+      return null;
+    }
+    String sanitized = value.asText().replaceAll("\\p{Cntrl}", " ").trim();
+    if (sanitized.isBlank()) {
+      return null;
+    }
+    return sanitized.length() <= 300 ? sanitized : sanitized.substring(0, 300);
+  }
+
   private String trimSlash(String value) {
     return value.replaceAll("/+$", "");
   }
@@ -659,5 +697,9 @@ public class EfiProvider implements PaymentProvider {
   }
 
   private record AccessToken(String value, OffsetDateTime expiresAt) {
+  }
+
+  private record ProviderError(String code, String error, String description, String message) {
+    private static final ProviderError EMPTY = new ProviderError(null, null, null, null);
   }
 }

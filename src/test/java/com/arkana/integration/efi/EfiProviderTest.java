@@ -9,6 +9,10 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -23,18 +27,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
+@ExtendWith(OutputCaptureExtension.class)
 class EfiProviderTest {
   private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-08-10T12:00:00Z"), ZoneOffset.UTC);
   private HttpServer server;
   private EfiProvider provider;
   private AtomicInteger oauthRequests;
   private AtomicReference<String> subscriptionBody;
+  private boolean rejectSubscription;
 
   @BeforeEach
   void setUp() throws IOException {
     oauthRequests = new AtomicInteger();
     subscriptionBody = new AtomicReference<>();
+    rejectSubscription = false;
     server = HttpServer.create(new InetSocketAddress(0), 0);
     server.createContext("/", this::respond);
     server.start();
@@ -101,6 +109,28 @@ class EfiProviderTest {
         .hasMessageContaining("Invalid credentials");
   }
 
+  @Test
+  void shouldExposeUsefulSafeMessageAndLogOnlyAllowlistedProviderError(CapturedOutput output) {
+    rejectSubscription = true;
+
+    Throwable failure = catchThrowable(
+        () -> provider.createCheckout(command(BillingPaymentMethod.CARD)));
+
+    assertThat(failure)
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("Efí could not process the payment right now");
+    assertThat(failure.getMessage())
+        .doesNotContain("provider-payment-token", "52998224725");
+
+    assertThat(output.getAll())
+        .contains("status=500")
+        .contains("providerCode=provider_error")
+        .contains("providerError=internal_error")
+        .contains("providerDescription=Could not create subscription")
+        .doesNotContain("provider-payment-token")
+        .doesNotContain("52998224725");
+  }
+
   private PaymentProvider.CreateCheckout command(BillingPaymentMethod method) {
     return new PaymentProvider.CreateCheckout(
         "account-id",
@@ -122,13 +152,21 @@ class EfiProviderTest {
   private void respond(HttpExchange exchange) throws IOException {
     String path = exchange.getRequestURI().getPath();
     String response;
+    int status = 200;
     if (path.equals("/v1/authorize")) {
       oauthRequests.incrementAndGet();
       response = "{\"access_token\":\"access-token\",\"expires_in\":300}";
     } else if (path.contains("/subscription/one-step")) {
       subscriptionBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-      response = "{\"data\":{\"subscription_id\":\"subscription-123\","
-          + "\"charge\":{\"id\":\"charge-123\"}}}";
+      if (rejectSubscription) {
+        status = 500;
+        response = "{\"code\":\"provider_error\",\"error\":\"internal_error\","
+            + "\"error_description\":\"Could not create subscription\","
+            + "\"payment_token\":\"provider-payment-token\",\"cpf\":\"52998224725\"}";
+      } else {
+        response = "{\"data\":{\"subscription_id\":\"subscription-123\","
+            + "\"charge\":{\"id\":\"charge-123\"}}}";
+      }
     } else if (path.equals("/v1/notification/notification-token")) {
       response = "{\"data\":[{\"id\":\"history-1\",\"type\":\"charge\","
           + "\"status\":{\"current\":\"waiting\"}},{\"id\":\"history-2\","
@@ -142,7 +180,7 @@ class EfiProviderTest {
     }
     byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
     exchange.getResponseHeaders().add("Content-Type", "application/json");
-    exchange.sendResponseHeaders(200, bytes.length);
+    exchange.sendResponseHeaders(status, bytes.length);
     exchange.getResponseBody().write(bytes);
     exchange.close();
   }

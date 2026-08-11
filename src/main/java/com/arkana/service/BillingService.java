@@ -107,7 +107,7 @@ public class BillingService {
 
   @Transactional
   public BillingOverview startTrial(UUID ownerId) {
-    Profile profile = profiles.findById(ownerId).orElseThrow(() ->
+    Profile profile = profiles.findByIdForUpdate(ownerId).orElseThrow(() ->
         new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found."));
     if (accounts.existsByOwnerId(ownerId)) {
       return overview(ownerId);
