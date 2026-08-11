@@ -110,7 +110,7 @@ class EfiProviderTest {
   }
 
   @Test
-  void shouldExposeUsefulSafeMessageAndLogOnlyAllowlistedProviderError(CapturedOutput output) {
+  void shouldExposeUsefulSafeMessageAndLogCompleteProviderResponse(CapturedOutput output) {
     rejectSubscription = true;
 
     Throwable failure = catchThrowable(
@@ -124,11 +124,10 @@ class EfiProviderTest {
 
     assertThat(output.getAll())
         .contains("status=500")
-        .contains("providerCode=provider_error")
-        .contains("providerError=internal_error")
-        .contains("providerDescription=Could not create subscription")
-        .doesNotContain("provider-payment-token")
-        .doesNotContain("52998224725");
+        .contains("responseBody={\"code\":3500034,\"error\":\"validation_error\","
+            + "\"error_description\":{\"property\":\"/payment/credit_card/trial_days\","
+            + "\"message\":\"Propriedade desconhecida (não está no schema).\"}}")
+        .doesNotContain("browser-token", "52998224725");
   }
 
   private PaymentProvider.CreateCheckout command(BillingPaymentMethod method) {
@@ -160,9 +159,10 @@ class EfiProviderTest {
       subscriptionBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
       if (rejectSubscription) {
         status = 500;
-        response = "{\"code\":\"provider_error\",\"error\":\"internal_error\","
-            + "\"error_description\":\"Could not create subscription\","
-            + "\"payment_token\":\"provider-payment-token\",\"cpf\":\"52998224725\"}";
+        response = "{\"code\":3500034,\"error\":\"validation_error\","
+            + "\"error_description\":{"
+            + "\"property\":\"/payment/credit_card/trial_days\","
+            + "\"message\":\"Propriedade desconhecida (não está no schema).\"}}";
       } else {
         response = "{\"data\":{\"subscription_id\":\"subscription-123\","
             + "\"charge\":{\"id\":\"charge-123\"}}}";
