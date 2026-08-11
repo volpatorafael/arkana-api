@@ -18,7 +18,7 @@ public class ResendEmailNotifier implements EmailNotifier {
 
   public ResendEmailNotifier(
       @Value("${arkana.resend.api-key:}") String apiKey,
-      @Value("${arkana.resend.from:Arkana <hello@arkana.app>}") String from) {
+      @Value("${arkana.resend.from:Arkana <hello@getarkana.com>}") String from) {
     this.apiKey = apiKey;
     this.from = from;
   }

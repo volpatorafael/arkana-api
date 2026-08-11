@@ -31,7 +31,7 @@ arkana:
     provider: ${BILLING_PROVIDER:ASAAS}
   resend:
     api-key: ${RESEND_API_KEY:}
-    from: ${RESEND_FROM:Arkana <hello@arkana.app>}
+    from: ${RESEND_FROM:Arkana <hello@getarkana.com>}
   abacatepay:
     api-key: ${ABACATEPAY_API_KEY:}
     webhook-secret: ${ABACATEPAY_WEBHOOK_SECRET:}
