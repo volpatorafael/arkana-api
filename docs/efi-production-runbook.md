@@ -14,20 +14,107 @@ and Abacate Pay subscriptions remain bound to their persisted provider.
 
 ## 2. Efí plans
 
-Create monthly and annual plans in API Cobranças with the same amount and
-interval as `billing_plan_prices`. Register each returned plan ID without
-changing existing mappings:
+Create both plans in the same API Cobranças environment as the credentials used
+by `arkana-api`. The plan defines recurrence, not price; Arkana sends the current
+price as the subscription item when checkout is created.
+
+For homologation, authenticate against
+`https://cobrancas-h.api.efipay.com.br/v1/authorize`, then call
+`POST https://cobrancas-h.api.efipay.com.br/v1/plan` with these bodies:
+
+```json
+{
+  "name": "Arkana Mensal - Homologacao",
+  "interval": 1,
+  "repeats": null
+}
+```
+
+```json
+{
+  "name": "Arkana Anual - Homologacao",
+  "interval": 12,
+  "repeats": null
+}
+```
+
+For production, use the production API and names without `- Homologacao`.
+Record each numeric `data.plan_id` returned by Efí. Register those IDs with this
+idempotent SQL, replacing both placeholders:
+
+The following copy/paste sequence uses homologation and requires `jq`. It reads
+credentials interactively so the secret is not written into shell history:
+
+```bash
+printf 'Efí homologation Client_Id: '
+IFS= read -r EFI_SETUP_CLIENT_ID
+printf 'Efí homologation Client_Secret: '
+stty -echo
+IFS= read -r EFI_SETUP_CLIENT_SECRET
+stty echo
+printf '\n'
+
+EFI_SETUP_AUTH_RESPONSE=$(curl -sS \
+  --request POST \
+  --user "${EFI_SETUP_CLIENT_ID}:${EFI_SETUP_CLIENT_SECRET}" \
+  --header 'Content-Type: application/json' \
+  --data '{"grant_type":"client_credentials"}' \
+  https://cobrancas-h.api.efipay.com.br/v1/authorize)
+
+printf '%s\n' "$EFI_SETUP_AUTH_RESPONSE" | jq .
+EFI_SETUP_ACCESS_TOKEN=$(printf '%s' "$EFI_SETUP_AUTH_RESPONSE" | jq -er '.access_token')
+
+curl -sS \
+  --request POST \
+  --header "Authorization: Bearer ${EFI_SETUP_ACCESS_TOKEN}" \
+  --header 'Content-Type: application/json' \
+  --data '{"name":"Arkana Mensal - Homologacao","interval":1,"repeats":null}' \
+  https://cobrancas-h.api.efipay.com.br/v1/plan | jq .
+
+curl -sS \
+  --request POST \
+  --header "Authorization: Bearer ${EFI_SETUP_ACCESS_TOKEN}" \
+  --header 'Content-Type: application/json' \
+  --data '{"name":"Arkana Anual - Homologacao","interval":12,"repeats":null}' \
+  https://cobrancas-h.api.efipay.com.br/v1/plan | jq .
+
+unset EFI_SETUP_CLIENT_ID EFI_SETUP_CLIENT_SECRET EFI_SETUP_AUTH_RESPONSE EFI_SETUP_ACCESS_TOKEN
+```
+
+Do not run the block a second time after both calls succeed; it would create
+duplicate Efí plans. Copy the monthly and annual `data.plan_id` values before
+the final `unset` (the IDs remain visible in the command output).
+
+API-created plans may not appear as entries in the regular financial dashboard.
+Confirm them with `GET /v1/plans`, and inspect the calls in
+`API > Aplicações > <application> > Homologação > Histórico de Requisições`.
+A plan is only a recurrence template; it does not create a subscription or a
+financial transaction by itself.
 
 ```sql
 insert into billing_provider_plan_mappings
   (id, plan_price_id, provider, provider_product_id)
 values
   (gen_random_uuid(), '30000000-0000-0000-0000-000000000001', 'EFI', '<efi-monthly-plan-id>'),
-  (gen_random_uuid(), '30000000-0000-0000-0000-000000000002', 'EFI', '<efi-annual-plan-id>');
+  (gen_random_uuid(), '30000000-0000-0000-0000-000000000002', 'EFI', '<efi-annual-plan-id>')
+on conflict (plan_price_id, provider) do update
+set provider_product_id = excluded.provider_product_id;
+```
+
+Verify the result without exposing any credentials:
+
+```sql
+select plan_price_id, provider, provider_product_id
+from billing_provider_plan_mappings
+where provider = 'EFI'
+order by plan_price_id;
 ```
 
 Pix Automático uses the Arkana plan amount directly and therefore does not need
 an external plan ID. The mappings above are required for card subscriptions.
+The schema has one Efí mapping per Arkana price, not one per environment. If a
+shared database is temporarily used for homologation, replace the homologation
+IDs with production plan IDs before switching to production Efí credentials.
 
 ## 3. Runtime configuration
 
@@ -193,7 +280,12 @@ event IDs provide application-level deduplication.
 ## 5. Homologation checklist
 
 - Card during trial: subscription created with deferred first charge.
-- Card after trial: immediate first charge and webhook activation.
+- Card after trial: subscription and first charge are created. Efí homologation
+  currently leaves recurring-card subscriptions in `waiting` and does not offer
+  a payment simulation that advances them to `paid`; do not wait for a paid
+  webhook from this sandbox flow. Validate paid-webhook handling with automated
+  integration tests and repeat the complete provider flow during the controlled
+  production smoke test.
 - Pix during trial: Jornada 2 authorization, with recurrence starting at trial end.
 - Pix after trial: Jornada 3 immediate charge plus recurrence authorization.
 - Pix approval, payment, renewal, cancellation and terminal retry exhaustion.

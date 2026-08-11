@@ -98,6 +98,12 @@ class ApiMigrationIntegrationTest extends BaseControllerIT {
   }
 
   @Test
+  void faviconIsPublic() throws Exception {
+    mvc.perform(get("/favicon.ico"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void authenticationAndProfileUseTheJwtSubject() throws Exception {
     mvc.perform(get("/v1/profile"))
         .andExpect(status().isUnauthorized())
