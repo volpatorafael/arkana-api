@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import java.time.LocalDate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -82,9 +84,10 @@ class ClientControllerIT extends BaseControllerIT {
         String response = mockMvcPerform(post("/v1/clients")
                 .with(authenticatedAs(firstUser))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"First client\"}"))
+                .content("{\"name\":\"First client\",\"birthDate\":\"1990-06-15\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.name").value("First client"))
+            .andExpect(jsonPath("$.birthDate").value("1990-06-15"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -93,6 +96,16 @@ class ClientControllerIT extends BaseControllerIT {
         Client persisted = clientRepository.findById(java.util.UUID.fromString(clientId)).orElseThrow();
         assertThat(persisted.getOwnerId()).isEqualTo(firstUser.getId());
         assertThat(persisted.getOwnerId()).isNotEqualTo(secondUser.getId());
+        assertThat(persisted.getBirthDate()).isEqualTo(LocalDate.of(1990, 6, 15));
+    }
+
+    @Test
+    void shouldRejectClientBirthDateInTheFuture() throws Exception {
+        mockMvcPerform(post("/v1/clients")
+                .with(authenticatedAs(firstUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Future client\",\"birthDate\":\"2999-01-01\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -118,9 +131,10 @@ class ClientControllerIT extends BaseControllerIT {
         mockMvcPerform(put("/v1/clients/{id}", firstClient.getId())
                 .with(authenticatedAs(firstUser))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Updated own client\"}"))
+                .content("{\"name\":\"Updated own client\",\"birthDate\":\"1985-12-03\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.name").value("Updated own client"));
+            .andExpect(jsonPath("$.name").value("Updated own client"))
+            .andExpect(jsonPath("$.birthDate").value("1985-12-03"));
 
         expectNotFound(
             mockMvcPerform(put("/v1/clients/{id}", secondClient.getId())

@@ -2,12 +2,17 @@ package com.arkana.dto.client;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
 
 public record SaveClientRequest(
     @NotBlank(message = "name is required.")
     @Size(max = 160, message = "name must contain at most 160 characters.")
     String name,
+    @PastOrPresent(message = "birthDate must not be in the future.")
+    LocalDate birthDate,
     @Email(message = "email must be valid.")
     @Size(max = 320, message = "email must contain at most 320 characters.")
     String email,

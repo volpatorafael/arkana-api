@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -30,6 +31,8 @@ public class Client {
   private UUID ownerId;
   @Column(nullable = false, length = 160)
   private String name;
+  @Column(name = "birth_date")
+  private LocalDate birthDate;
   @Column(length = 320)
   private String email;
   @Column(length = 40)
@@ -55,8 +58,14 @@ public class Client {
     updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
   }
 
-  public void update(String name, String email, String phone, String notes) {
+  public void update(
+      String name,
+      LocalDate birthDate,
+      String email,
+      String phone,
+      String notes) {
     this.name = name;
+    this.birthDate = birthDate;
     this.email = email;
     this.phone = phone;
     this.notes = notes;

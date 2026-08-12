@@ -47,6 +47,7 @@ public class ClientService {
         .id(UUID.randomUUID())
         .ownerId(userId)
         .name(normalizedName(request.name()))
+        .birthDate(request.birthDate())
         .email(nullable(request.email()))
         .phone(nullable(request.phone()))
         .notes(nullable(request.notes()))
@@ -66,6 +67,7 @@ public class ClientService {
     Client client = find(userId, clientId);
     client.update(
         normalizedName(request.name()),
+        request.birthDate(),
         nullable(request.email()),
         nullable(request.phone()),
         nullable(request.notes()));
