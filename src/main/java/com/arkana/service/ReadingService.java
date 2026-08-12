@@ -101,6 +101,9 @@ public class ReadingService {
         .title(trim(request.title()))
         .question(trim(request.question()))
         .context(trim(request.context()))
+        .consultationFeeAmount(request.consultationFeeAmount())
+        .consultationFeeCurrency("BRL")
+        .consultationDurationMinutes(request.consultationDurationMinutes())
         .startedAt(createdAt)
         .createdAt(createdAt)
         .updatedAt(createdAt)
@@ -214,6 +217,10 @@ public class ReadingService {
         trim(request.question()),
         request.contextPresent(),
         trim(request.context()),
+        request.consultationFeeAmountPresent(),
+        request.consultationFeeAmount(),
+        request.consultationDurationMinutesPresent(),
+        request.consultationDurationMinutes(),
         request.startedAtPresent(),
         request.startedAt(),
         now());

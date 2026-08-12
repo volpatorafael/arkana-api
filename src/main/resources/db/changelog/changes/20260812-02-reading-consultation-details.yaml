@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260812-02-add-reading-consultation-details
+      author: arkana
+      changes:
+        - addColumn:
+            tableName: readings
+            columns:
+              - column:
+                  name: consultation_fee_amount
+                  type: integer
+              - column:
+                  name: consultation_fee_currency
+                  type: varchar(3)
+                  defaultValue: BRL
+                  constraints:
+                    nullable: false
+              - column:
+                  name: consultation_duration_minutes
+                  type: integer
+        - sql:
+            sql: >-
+              alter table readings
+              add constraint readings_consultation_fee_amount_check
+                check (consultation_fee_amount is null or consultation_fee_amount >= 0)
+        - sql:
+            sql: >-
+              alter table readings
+              add constraint readings_consultation_fee_currency_check
+                check (consultation_fee_currency = 'BRL')
+        - sql:
+            sql: >-
+              alter table readings
+              add constraint readings_consultation_duration_check
+                check (
+                  consultation_duration_minutes is null
+                  or consultation_duration_minutes between 1 and 1440
+                )

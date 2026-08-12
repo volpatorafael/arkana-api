@@ -43,6 +43,13 @@ public class Reading {
   private String question;
   @Column(length = 10000)
   private String context;
+  @Column(name = "consultation_fee_amount")
+  private Integer consultationFeeAmount;
+  @Builder.Default
+  @Column(name = "consultation_fee_currency", nullable = false, length = 3)
+  private String consultationFeeCurrency = "BRL";
+  @Column(name = "consultation_duration_minutes")
+  private Integer consultationDurationMinutes;
   @Column(name = "started_at", nullable = false)
   private OffsetDateTime startedAt;
   @Column(name = "completed_at")
@@ -67,6 +74,10 @@ public class Reading {
       String question,
       boolean contextPresent,
       String context,
+      boolean consultationFeeAmountPresent,
+      Integer consultationFeeAmount,
+      boolean consultationDurationMinutesPresent,
+      Integer consultationDurationMinutes,
       boolean startedAtPresent,
       OffsetDateTime startedAt,
       OffsetDateTime updatedAt) {
@@ -87,6 +98,12 @@ public class Reading {
     }
     if (contextPresent) {
       this.context = context;
+    }
+    if (consultationFeeAmountPresent) {
+      this.consultationFeeAmount = consultationFeeAmount;
+    }
+    if (consultationDurationMinutesPresent) {
+      this.consultationDurationMinutes = consultationDurationMinutes;
     }
     if (startedAtPresent) {
       this.startedAt = startedAt;

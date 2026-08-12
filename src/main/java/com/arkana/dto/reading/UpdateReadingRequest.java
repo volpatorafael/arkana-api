@@ -1,6 +1,9 @@
 package com.arkana.dto.reading;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.time.OffsetDateTime;
@@ -15,9 +18,14 @@ public final class UpdateReadingRequest {
   private String question;
   @Size(max = 10000)
   private String context;
+  @PositiveOrZero
+  private Integer consultationFeeAmount;
+  @Min(1)
+  @Max(1440)
+  private Integer consultationDurationMinutes;
   private OffsetDateTime startedAt;
   private boolean clientPresent, spreadPresent, deckPresent, titlePresent, questionPresent, contextPresent,
-      startedAtPresent;
+      consultationFeeAmountPresent, consultationDurationMinutesPresent, startedAtPresent;
 
   @JsonSetter
   public void setClientId(UUID value) {
@@ -56,6 +64,18 @@ public final class UpdateReadingRequest {
   }
 
   @JsonSetter
+  public void setConsultationFeeAmount(Integer value) {
+    consultationFeeAmount = value;
+    consultationFeeAmountPresent = true;
+  }
+
+  @JsonSetter
+  public void setConsultationDurationMinutes(Integer value) {
+    consultationDurationMinutes = value;
+    consultationDurationMinutesPresent = true;
+  }
+
+  @JsonSetter
   public void setStartedAt(OffsetDateTime value) {
     startedAt = value;
     startedAtPresent = true;
@@ -83,6 +103,14 @@ public final class UpdateReadingRequest {
 
   public String context() {
     return context;
+  }
+
+  public Integer consultationFeeAmount() {
+    return consultationFeeAmount;
+  }
+
+  public Integer consultationDurationMinutes() {
+    return consultationDurationMinutes;
   }
 
   public OffsetDateTime startedAt() {
@@ -113,12 +141,20 @@ public final class UpdateReadingRequest {
     return contextPresent;
   }
 
+  public boolean consultationFeeAmountPresent() {
+    return consultationFeeAmountPresent;
+  }
+
+  public boolean consultationDurationMinutesPresent() {
+    return consultationDurationMinutesPresent;
+  }
+
   public boolean startedAtPresent() {
     return startedAtPresent;
   }
 
   public boolean any() {
     return clientPresent || spreadPresent || deckPresent || titlePresent || questionPresent || contextPresent
-        || startedAtPresent;
+        || consultationFeeAmountPresent || consultationDurationMinutesPresent || startedAtPresent;
   }
 }

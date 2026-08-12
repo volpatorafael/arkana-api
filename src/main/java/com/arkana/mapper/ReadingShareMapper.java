@@ -26,6 +26,7 @@ public interface ReadingShareMapper {
   @Mapping(target = "question", source = "share.reading.question")
   @Mapping(target = "spread", source = "spread")
   @Mapping(target = "deckMode", source = "share.reading.deckMode")
+  @Mapping(target = "startedAt", source = "share.reading.startedAt")
   @Mapping(target = "completedAt", source = "share.reading.completedAt")
   @Mapping(target = "readerDisplayName", source = "reader.displayName")
   @Mapping(target = "positions", source = "positions")

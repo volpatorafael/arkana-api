@@ -143,6 +143,8 @@ class ReadingShareControllerIT extends BaseControllerIT {
         reading.setTitle("Leitura compartilhada");
         reading.setQuestion("Qual caminho seguir?");
         reading.setContext("Contexto privado");
+        reading.setConsultationFeeAmount(18000);
+        reading.setConsultationDurationMinutes(60);
         reading.archive(now());
         readingRepository.saveAndFlush(reading);
         var comment = entityGeneratorService.randomComment(firstUser, reading);
@@ -160,6 +162,7 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.spread.id").value("advice"))
                 .andExpect(jsonPath("$.spread.name").isNotEmpty())
                 .andExpect(jsonPath("$.deckMode").value("MAJOR"))
+                .andExpect(jsonPath("$.startedAt").value(reading.getStartedAt().toString()))
                 .andExpect(jsonPath("$.completedAt").isNotEmpty())
                 .andExpect(jsonPath("$.positions", hasSize(1)))
                 .andExpect(jsonPath("$.positions[0].key").isNotEmpty())
@@ -179,6 +182,9 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.readingId").doesNotExist())
                 .andExpect(jsonPath("$.ownerId").doesNotExist())
                 .andExpect(jsonPath("$.context").doesNotExist())
+                .andExpect(jsonPath("$.consultationFeeAmount").doesNotExist())
+                .andExpect(jsonPath("$.consultationFeeCurrency").doesNotExist())
+                .andExpect(jsonPath("$.consultationDurationMinutes").doesNotExist())
                 .andExpect(jsonPath("$.comments", hasSize(1)))
                 .andExpect(jsonPath("$.comments[0].id").value(comment.getId().toString()))
                 .andExpect(jsonPath("$.comments[0].body").value("Comentario publico"))

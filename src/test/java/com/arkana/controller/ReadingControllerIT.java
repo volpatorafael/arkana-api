@@ -75,6 +75,9 @@ class ReadingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.items[0].title").value(firstReading.getTitle()))
             .andExpect(jsonPath("$.items[0].question").isEmpty())
             .andExpect(jsonPath("$.items[0].context").isEmpty())
+            .andExpect(jsonPath("$.items[0].consultationFeeAmount").isEmpty())
+            .andExpect(jsonPath("$.items[0].consultationFeeCurrency").value("BRL"))
+            .andExpect(jsonPath("$.items[0].consultationDurationMinutes").isEmpty())
             .andExpect(jsonPath("$.items[0].startedAt").isNotEmpty())
             .andExpect(jsonPath("$.items[0].completedAt").isEmpty())
             .andExpect(jsonPath("$.items[0].archivedAt").isEmpty())
@@ -106,7 +109,8 @@ class ReadingControllerIT extends BaseControllerIT {
                 .with(authenticatedAs(firstUser))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientId\":\"" + firstClient.getId()
-                    + "\",\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\"}"))
+                    + "\",\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
+                    + "\"consultationFeeAmount\":15000,\"consultationDurationMinutes\":90}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").isNotEmpty())
             .andExpect(jsonPath("$.clientId").value(firstClient.getId().toString()))
@@ -118,6 +122,9 @@ class ReadingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.title").isEmpty())
             .andExpect(jsonPath("$.question").isEmpty())
             .andExpect(jsonPath("$.context").isEmpty())
+            .andExpect(jsonPath("$.consultationFeeAmount").value(15000))
+            .andExpect(jsonPath("$.consultationFeeCurrency").value("BRL"))
+            .andExpect(jsonPath("$.consultationDurationMinutes").value(90))
             .andExpect(jsonPath("$.startedAt").isNotEmpty())
             .andExpect(jsonPath("$.completedAt").isEmpty())
             .andExpect(jsonPath("$.archivedAt").isEmpty())
@@ -144,6 +151,9 @@ class ReadingControllerIT extends BaseControllerIT {
         UUID createdId = UUID.fromString(JsonPath.read(response, "$.id"));
         Reading created = readingRepository.findById(createdId).orElseThrow();
         assertThat(created.getOwnerId()).isEqualTo(firstUser.getId());
+        assertThat(created.getConsultationFeeAmount()).isEqualTo(15000);
+        assertThat(created.getConsultationFeeCurrency()).isEqualTo("BRL");
+        assertThat(created.getConsultationDurationMinutes()).isEqualTo(90);
 
         long countBeforeForeignAttempt = readingRepository.count();
         expectNotFound(
@@ -154,6 +164,23 @@ class ReadingControllerIT extends BaseControllerIT {
                     + "\",\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\"}")),
             "Client not found.");
         assertThat(readingRepository.count()).isEqualTo(countBeforeForeignAttempt);
+    }
+
+    @Test
+    void shouldRejectInvalidConsultationDetails() throws Exception {
+        mockMvcPerform(post("/v1/readings")
+                .with(authenticatedAs(firstUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
+                    + "\"consultationFeeAmount\":-1}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvcPerform(post("/v1/readings")
+                .with(authenticatedAs(firstUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
+                    + "\"consultationDurationMinutes\":0}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -197,9 +224,13 @@ class ReadingControllerIT extends BaseControllerIT {
         mockMvcPerform(patch("/v1/readings/{id}", firstReading.getId())
                 .with(authenticatedAs(firstUser))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"Updated own reading\"}"))
+                .content("{\"title\":\"Updated own reading\","
+                    + "\"consultationFeeAmount\":22550,\"consultationDurationMinutes\":75}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.title").value("Updated own reading"));
+            .andExpect(jsonPath("$.title").value("Updated own reading"))
+            .andExpect(jsonPath("$.consultationFeeAmount").value(22550))
+            .andExpect(jsonPath("$.consultationFeeCurrency").value("BRL"))
+            .andExpect(jsonPath("$.consultationDurationMinutes").value(75));
 
         expectNotFound(
             mockMvcPerform(patch("/v1/readings/{id}", secondReading.getId())
