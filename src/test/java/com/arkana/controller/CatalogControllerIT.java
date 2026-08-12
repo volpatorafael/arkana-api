@@ -58,7 +58,7 @@ class CatalogControllerIT extends BaseControllerIT {
     void shouldReturnSharedSpreadCatalogOnlyToUsersWithProductAccess() throws Exception {
         String firstResponse = mockMvcPerform(get("/v1/spreads?locale=en").with(authenticatedAs(firstUser)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(8)))
+            .andExpect(jsonPath("$", hasSize(12)))
             .andReturn().getResponse().getContentAsString();
         String secondResponse = mockMvcPerform(get("/v1/spreads?locale=en").with(authenticatedAs(secondUser)))
             .andExpect(status().isOk())
@@ -98,5 +98,86 @@ class CatalogControllerIT extends BaseControllerIT {
 
         mockMvcPerform(get("/v1/spreads/advice").with(authenticatedAs(blockedUser)))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnLocalizedDiamondSpreadWithItsLayout() throws Exception {
+        mockMvcPerform(get("/v1/spreads/diamond?locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value("diamond"))
+            .andExpect(jsonPath("$.name").value("Diamante"))
+            .andExpect(jsonPath("$.positionCount").value(5))
+            .andExpect(jsonPath("$.positions", hasSize(5)))
+            .andExpect(jsonPath("$.positions[0].key").value("1"))
+            .andExpect(jsonPath("$.positions[0].meaning").value("A questão ou assunto que precisa de mais clareza."))
+            .andExpect(jsonPath("$.positions[0].x").value(50.0))
+            .andExpect(jsonPath("$.positions[0].y").value(50.0))
+            .andExpect(jsonPath("$.positions[1].x").value(25.0))
+            .andExpect(jsonPath("$.positions[2].x").value(75.0))
+            .andExpect(jsonPath("$.positions[3].y").value(82.0))
+            .andExpect(jsonPath("$.positions[4].y").value(18.0));
+    }
+
+    @Test
+    void shouldReturnLocalizedDecisionSpreadWithItsLayout() throws Exception {
+        mockMvcPerform(get("/v1/spreads/decision?locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value("decision"))
+            .andExpect(jsonPath("$.name").value("Decisão"))
+            .andExpect(jsonPath("$.positionCount").value(6))
+            .andExpect(jsonPath("$.positions", hasSize(6)))
+            .andExpect(jsonPath("$.positions[0].meaning").value("Energia geral que envolve a questão."))
+            .andExpect(jsonPath("$.positions[0].x").value(15.0))
+            .andExpect(jsonPath("$.positions[1].x").value(40.0))
+            .andExpect(jsonPath("$.positions[1].y").value(25.0))
+            .andExpect(jsonPath("$.positions[2].x").value(60.0))
+            .andExpect(jsonPath("$.positions[3].y").value(75.0))
+            .andExpect(jsonPath("$.positions[4].y").value(75.0))
+            .andExpect(jsonPath("$.positions[5].x").value(85.0));
+    }
+
+    @Test
+    void shouldReturnLocalizedBlindSpotSpreadWithItsLayout() throws Exception {
+        mockMvcPerform(get("/v1/spreads/blind-spot?locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value("blind-spot"))
+            .andExpect(jsonPath("$.name").value("Ponto Cego"))
+            .andExpect(jsonPath("$.positionCount").value(4))
+            .andExpect(jsonPath("$.positions", hasSize(4)))
+            .andExpect(jsonPath("$.positions[0].name").value("Identidade pessoal"))
+            .andExpect(jsonPath("$.positions[0].x").value(35.0))
+            .andExpect(jsonPath("$.positions[0].y").value(30.0))
+            .andExpect(jsonPath("$.positions[1].name").value("O grande desconhecido"))
+            .andExpect(jsonPath("$.positions[1].x").value(65.0))
+            .andExpect(jsonPath("$.positions[1].y").value(70.0))
+            .andExpect(jsonPath("$.positions[2].x").value(35.0))
+            .andExpect(jsonPath("$.positions[2].y").value(70.0))
+            .andExpect(jsonPath("$.positions[3].x").value(65.0))
+            .andExpect(jsonPath("$.positions[3].y").value(30.0));
+    }
+
+    @Test
+    void shouldReturnLocalizedTempleOfZeusSpreadWithItsLayout() throws Exception {
+        mockMvcPerform(get("/v1/spreads/temple-of-zeus?locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value("temple-of-zeus"))
+            .andExpect(jsonPath("$.name").value("Templo de Zeus"))
+            .andExpect(jsonPath("$.positionCount").value(4))
+            .andExpect(jsonPath("$.positions", hasSize(4)))
+            .andExpect(jsonPath("$.positions[0].name").value("Passado recente"))
+            .andExpect(jsonPath("$.positions[0].x").value(22.0))
+            .andExpect(jsonPath("$.positions[0].y").value(50.0))
+            .andExpect(jsonPath("$.positions[1].name").value("Situação atual"))
+            .andExpect(jsonPath("$.positions[1].x").value(50.0))
+            .andExpect(jsonPath("$.positions[1].y").value(78.0))
+            .andExpect(jsonPath("$.positions[2].x").value(78.0))
+            .andExpect(jsonPath("$.positions[2].y").value(50.0))
+            .andExpect(jsonPath("$.positions[3].name").value("Conselho financeiro"))
+            .andExpect(jsonPath("$.positions[3].x").value(50.0))
+            .andExpect(jsonPath("$.positions[3].y").value(22.0));
     }
 }
