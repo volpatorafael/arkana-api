@@ -50,6 +50,8 @@ public class Reading {
   private String consultationFeeCurrency = "BRL";
   @Column(name = "consultation_duration_minutes")
   private Integer consultationDurationMinutes;
+  @Column(name = "analysis_video_url", length = 2048)
+  private String analysisVideoUrl;
   @Column(name = "started_at", nullable = false)
   private OffsetDateTime startedAt;
   @Column(name = "completed_at")
@@ -78,6 +80,8 @@ public class Reading {
       Integer consultationFeeAmount,
       boolean consultationDurationMinutesPresent,
       Integer consultationDurationMinutes,
+      boolean analysisVideoUrlPresent,
+      String analysisVideoUrl,
       boolean startedAtPresent,
       OffsetDateTime startedAt,
       OffsetDateTime updatedAt) {
@@ -104,6 +108,9 @@ public class Reading {
     }
     if (consultationDurationMinutesPresent) {
       this.consultationDurationMinutes = consultationDurationMinutes;
+    }
+    if (analysisVideoUrlPresent) {
+      this.analysisVideoUrl = analysisVideoUrl;
     }
     if (startedAtPresent) {
       this.startedAt = startedAt;

@@ -10,6 +10,7 @@ public record SharedReadingResponse(
     String question,
     ReadingSpreadSummaryResponse spread,
     String deckMode,
+    String analysisVideoUrl,
     OffsetDateTime startedAt,
     OffsetDateTime completedAt,
     String readerDisplayName,

@@ -145,6 +145,7 @@ class ReadingShareControllerIT extends BaseControllerIT {
         reading.setContext("Contexto privado");
         reading.setConsultationFeeAmount(18000);
         reading.setConsultationDurationMinutes(60);
+        reading.setAnalysisVideoUrl("https://www.youtube.com/watch?v=abc123");
         reading.archive(now());
         readingRepository.saveAndFlush(reading);
         var comment = entityGeneratorService.randomComment(firstUser, reading);
@@ -162,6 +163,8 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.spread.id").value("advice"))
                 .andExpect(jsonPath("$.spread.name").isNotEmpty())
                 .andExpect(jsonPath("$.deckMode").value("MAJOR"))
+                .andExpect(jsonPath("$.analysisVideoUrl")
+                    .value("https://www.youtube.com/watch?v=abc123"))
                 .andExpect(jsonPath("$.startedAt").value(reading.getStartedAt().toString()))
                 .andExpect(jsonPath("$.completedAt").isNotEmpty())
                 .andExpect(jsonPath("$.positions", hasSize(1)))

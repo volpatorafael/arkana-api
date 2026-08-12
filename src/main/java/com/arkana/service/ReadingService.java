@@ -41,6 +41,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -89,6 +91,7 @@ public class ReadingService {
     ReadingDeckMode deckMode = deckMode(request.deckMode());
     requireSpread(request.spreadId());
     requireClient(owner, request.clientId());
+    String analysisVideoUrl = analysisVideoUrl(request.analysisVideoUrl());
 
     OffsetDateTime createdAt = now();
     Reading reading = readings.save(Reading.builder()
@@ -104,6 +107,7 @@ public class ReadingService {
         .consultationFeeAmount(request.consultationFeeAmount())
         .consultationFeeCurrency("BRL")
         .consultationDurationMinutes(request.consultationDurationMinutes())
+        .analysisVideoUrl(analysisVideoUrl)
         .startedAt(createdAt)
         .createdAt(createdAt)
         .updatedAt(createdAt)
@@ -191,6 +195,9 @@ public class ReadingService {
     if (request.startedAtPresent() && request.startedAt() == null) {
       throw badRequest("startedAt cannot be null.");
     }
+    String analysisVideoUrl = request.analysisVideoUrlPresent()
+        ? analysisVideoUrl(request.analysisVideoUrl())
+        : null;
     ReadingDeckMode deckMode = reading.getDeckMode();
     if (request.deckPresent()) {
       if (request.deckMode() == null) {
@@ -221,6 +228,8 @@ public class ReadingService {
         request.consultationFeeAmount(),
         request.consultationDurationMinutesPresent(),
         request.consultationDurationMinutes(),
+        request.analysisVideoUrlPresent(),
+        analysisVideoUrl,
         request.startedAtPresent(),
         request.startedAt(),
         now());
@@ -483,6 +492,36 @@ public class ReadingService {
       throw badRequest("locale must be pt-BR or en.");
     }
     return value;
+  }
+
+  private String analysisVideoUrl(String value) {
+    String normalized = trim(value);
+    if (normalized == null) {
+      return null;
+    }
+    try {
+      URI uri = new URI(normalized);
+      String host = uri.getHost();
+      if (!"https".equalsIgnoreCase(uri.getScheme())
+          || host == null
+          || !allowedVideoHost(host)) {
+        throw badRequest("analysisVideoUrl must be a YouTube, Vimeo or Loom HTTPS URL.");
+      }
+      return normalized;
+    } catch (URISyntaxException exception) {
+      throw badRequest("analysisVideoUrl must be a valid URL.");
+    }
+  }
+
+  private boolean allowedVideoHost(String host) {
+    String normalized = host.toLowerCase(java.util.Locale.ROOT);
+    return normalized.equals("youtu.be")
+        || normalized.equals("youtube.com")
+        || normalized.endsWith(".youtube.com")
+        || normalized.equals("vimeo.com")
+        || normalized.endsWith(".vimeo.com")
+        || normalized.equals("loom.com")
+        || normalized.endsWith(".loom.com");
   }
 
   private Map<UUID, UUID> activeShareIds(

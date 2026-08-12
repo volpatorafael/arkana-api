@@ -110,7 +110,8 @@ class ReadingControllerIT extends BaseControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientId\":\"" + firstClient.getId()
                     + "\",\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
-                    + "\"consultationFeeAmount\":15000,\"consultationDurationMinutes\":90}"))
+                    + "\"consultationFeeAmount\":15000,\"consultationDurationMinutes\":90,"
+                    + "\"analysisVideoUrl\":\"https://www.youtube.com/watch?v=abc123\"}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").isNotEmpty())
             .andExpect(jsonPath("$.clientId").value(firstClient.getId().toString()))
@@ -125,6 +126,8 @@ class ReadingControllerIT extends BaseControllerIT {
             .andExpect(jsonPath("$.consultationFeeAmount").value(15000))
             .andExpect(jsonPath("$.consultationFeeCurrency").value("BRL"))
             .andExpect(jsonPath("$.consultationDurationMinutes").value(90))
+            .andExpect(jsonPath("$.analysisVideoUrl")
+                .value("https://www.youtube.com/watch?v=abc123"))
             .andExpect(jsonPath("$.startedAt").isNotEmpty())
             .andExpect(jsonPath("$.completedAt").isEmpty())
             .andExpect(jsonPath("$.archivedAt").isEmpty())
@@ -154,6 +157,8 @@ class ReadingControllerIT extends BaseControllerIT {
         assertThat(created.getConsultationFeeAmount()).isEqualTo(15000);
         assertThat(created.getConsultationFeeCurrency()).isEqualTo("BRL");
         assertThat(created.getConsultationDurationMinutes()).isEqualTo(90);
+        assertThat(created.getAnalysisVideoUrl())
+            .isEqualTo("https://www.youtube.com/watch?v=abc123");
 
         long countBeforeForeignAttempt = readingRepository.count();
         expectNotFound(
@@ -180,6 +185,20 @@ class ReadingControllerIT extends BaseControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
                     + "\"consultationDurationMinutes\":0}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvcPerform(post("/v1/readings")
+                .with(authenticatedAs(firstUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
+                    + "\"analysisVideoUrl\":\"http://video.example/analysis\"}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvcPerform(post("/v1/readings")
+                .with(authenticatedAs(firstUser))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"spreadId\":\"advice\",\"deckMode\":\"MAJOR\","
+                    + "\"analysisVideoUrl\":\"https://video.example/analysis\"}"))
             .andExpect(status().isBadRequest());
     }
 

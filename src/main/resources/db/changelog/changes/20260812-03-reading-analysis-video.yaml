@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260812-03-add-reading-analysis-video
+      author: arkana
+      changes:
+        - addColumn:
+            tableName: readings
+            columns:
+              - column:
+                  name: analysis_video_url
+                  type: varchar(2048)

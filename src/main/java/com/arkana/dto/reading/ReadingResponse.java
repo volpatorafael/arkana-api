@@ -18,6 +18,7 @@ public record ReadingResponse(
     Integer consultationFeeAmount,
     String consultationFeeCurrency,
     Integer consultationDurationMinutes,
+    String analysisVideoUrl,
     OffsetDateTime startedAt,
     OffsetDateTime completedAt,
     OffsetDateTime archivedAt,

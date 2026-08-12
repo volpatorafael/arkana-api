@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.OffsetDateTime;
@@ -23,9 +24,13 @@ public final class UpdateReadingRequest {
   @Min(1)
   @Max(1440)
   private Integer consultationDurationMinutes;
+  @Size(max = 2048)
+  @Pattern(regexp = "^https://.+")
+  private String analysisVideoUrl;
   private OffsetDateTime startedAt;
   private boolean clientPresent, spreadPresent, deckPresent, titlePresent, questionPresent, contextPresent,
-      consultationFeeAmountPresent, consultationDurationMinutesPresent, startedAtPresent;
+      consultationFeeAmountPresent, consultationDurationMinutesPresent, analysisVideoUrlPresent,
+      startedAtPresent;
 
   @JsonSetter
   public void setClientId(UUID value) {
@@ -76,6 +81,12 @@ public final class UpdateReadingRequest {
   }
 
   @JsonSetter
+  public void setAnalysisVideoUrl(String value) {
+    analysisVideoUrl = value;
+    analysisVideoUrlPresent = true;
+  }
+
+  @JsonSetter
   public void setStartedAt(OffsetDateTime value) {
     startedAt = value;
     startedAtPresent = true;
@@ -111,6 +122,10 @@ public final class UpdateReadingRequest {
 
   public Integer consultationDurationMinutes() {
     return consultationDurationMinutes;
+  }
+
+  public String analysisVideoUrl() {
+    return analysisVideoUrl;
   }
 
   public OffsetDateTime startedAt() {
@@ -149,12 +164,17 @@ public final class UpdateReadingRequest {
     return consultationDurationMinutesPresent;
   }
 
+  public boolean analysisVideoUrlPresent() {
+    return analysisVideoUrlPresent;
+  }
+
   public boolean startedAtPresent() {
     return startedAtPresent;
   }
 
   public boolean any() {
     return clientPresent || spreadPresent || deckPresent || titlePresent || questionPresent || contextPresent
-        || consultationFeeAmountPresent || consultationDurationMinutesPresent || startedAtPresent;
+        || consultationFeeAmountPresent || consultationDurationMinutesPresent || analysisVideoUrlPresent
+        || startedAtPresent;
   }
 }
