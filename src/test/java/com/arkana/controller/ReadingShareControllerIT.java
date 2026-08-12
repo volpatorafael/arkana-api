@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -165,7 +166,8 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.deckMode").value("MAJOR"))
                 .andExpect(jsonPath("$.analysisVideoUrl")
                     .value("https://www.youtube.com/watch?v=abc123"))
-                .andExpect(jsonPath("$.startedAt").value(reading.getStartedAt().toString()))
+                .andExpect(jsonPath("$.startedAt").value(
+                    reading.getStartedAt().truncatedTo(ChronoUnit.MICROS).toString()))
                 .andExpect(jsonPath("$.completedAt").isNotEmpty())
                 .andExpect(jsonPath("$.positions", hasSize(1)))
                 .andExpect(jsonPath("$.positions[0].key").isNotEmpty())
