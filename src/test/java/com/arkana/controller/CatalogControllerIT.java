@@ -5,6 +5,9 @@ import com.arkana.service.BillingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -16,6 +19,9 @@ class CatalogControllerIT extends BaseControllerIT {
 
     @Autowired
     private BillingService billingService;
+    @Autowired
+    @Qualifier("spreadCacheManager")
+    private CacheManager spreadCacheManager;
 
     private Profile firstUser;
     private Profile secondUser;
@@ -64,9 +70,14 @@ class CatalogControllerIT extends BaseControllerIT {
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
         assertThat(secondResponse).isEqualTo(firstResponse);
+        Cache cache = spreadCacheManager.getCache("localized-spreads");
+        assertThat(cache).isNotNull();
+        assertThat(cache.get("en")).isNotNull();
+        assertThat(cache.get("pt-BR")).isNull();
 
         mockMvcPerform(get("/v1/spreads").with(authenticatedAs(blockedUser)))
             .andExpect(status().isForbidden());
+        assertThat(cache.get("pt-BR")).isNull();
     }
 
     @Test

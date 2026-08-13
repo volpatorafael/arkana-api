@@ -1,14 +1,10 @@
 package com.arkana.service;
 
 import com.arkana.domain.ReadingDeckMode;
-import com.arkana.domain.Spread;
 import com.arkana.domain.TarotCard;
 import com.arkana.dto.catalog.SpreadResponse;
 import com.arkana.dto.catalog.TarotCardResponse;
-import com.arkana.mapper.SpreadMapper;
-import com.arkana.mapper.SpreadPositionMapper;
 import com.arkana.mapper.TarotCardMapper;
-import com.arkana.repository.SpreadRepository;
 import com.arkana.repository.TarotCardRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,10 +20,8 @@ import java.util.UUID;
 public class CatalogService {
   private final ProductAccessAuthorizer access;
   private final TarotCardRepository cards;
-  private final SpreadRepository spreads;
   private final TarotCardMapper cardMapper;
-  private final SpreadMapper spreadMapper;
-  private final SpreadPositionMapper spreadPositionMapper;
+  private final LocalizedSpreadCatalogService localizedSpreads;
 
   @Transactional(readOnly = true)
   public List<TarotCardResponse> cards(UUID userId, String deckMode, String locale) {
@@ -51,28 +45,17 @@ public class CatalogService {
   public List<SpreadResponse> spreads(UUID userId, String locale) {
     access.requireAccess(userId);
     String normalizedLocale = locale(locale);
-    return spreads.findAllByActiveTrueOrderByDisplayOrderAsc().stream()
-        .map(spread -> spreadMapper.toResponse(
-            spread,
-            spread.getPositions().stream()
-                .map(position -> spreadPositionMapper.toResponse(position, normalizedLocale))
-                .toList(),
-            normalizedLocale))
-        .toList();
+    return localizedSpreads.spreads(normalizedLocale);
   }
 
   @Transactional(readOnly = true)
   public SpreadResponse spread(UUID userId, String spreadId, String locale) {
     access.requireAccess(userId);
-    Spread row = spreads.findByIdAndActiveTrue(spreadId).orElseThrow(() ->
-        new ResponseStatusException(HttpStatus.NOT_FOUND, "Spread not found."));
     String normalizedLocale = locale(locale);
-    return spreadMapper.toResponse(
-        row,
-        row.getPositions().stream()
-            .map(position -> spreadPositionMapper.toResponse(position, normalizedLocale))
-            .toList(),
-        normalizedLocale);
+    return localizedSpreads.spreads(normalizedLocale).stream()
+        .filter(spread -> spread.id().equals(spreadId))
+        .findFirst()
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Spread not found."));
   }
 
   private String locale(String locale) {

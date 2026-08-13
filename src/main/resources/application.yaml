@@ -13,10 +13,6 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
-  cache:
-    cache-names: public-billing-plans
-    caffeine:
-      spec: maximumSize=5,expireAfterWrite=180s
   security:
     oauth2:
       resourceserver:

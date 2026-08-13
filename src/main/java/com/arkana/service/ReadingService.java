@@ -14,6 +14,7 @@ import com.arkana.dto.reading.ReadingCommentResponse;
 import com.arkana.dto.reading.ReadingPageResponse;
 import com.arkana.dto.reading.ReadingPositionResponse;
 import com.arkana.dto.reading.ReadingResponse;
+import com.arkana.dto.reading.ReadingSummaryResponse;
 import com.arkana.dto.reading.SaveReadingCommentRequest;
 import com.arkana.dto.reading.SaveReadingPositionRequest;
 import com.arkana.dto.reading.UpdateReadingRequest;
@@ -83,6 +84,30 @@ public class ReadingService {
 
   private static ResponseStatusException notFound(String detail) {
     return new ResponseStatusException(HttpStatus.NOT_FOUND, detail);
+  }
+
+  long countActiveForAuthorizedUser(UUID owner, ReadingStatus status) {
+    return readings.countByOwnerIdAndArchivedAtIsNullAndStatus(owner, status);
+  }
+
+  List<ReadingSummaryResponse> recentForAuthorizedUser(
+      UUID owner,
+      int limit,
+      String locale) {
+    String normalizedLocale = locale(locale);
+    Pageable pageable = PageRequest.of(
+        0,
+        limit,
+        Sort.by(Sort.Order.desc("startedAt"), Sort.Order.desc("id")));
+    List<Reading> recent = readings.findAllByOwnerIdAndArchivedAtIsNull(owner, pageable);
+    Map<UUID, UUID> shareIds = activeShareIds(recent, now());
+    Map<String, String> spreadNames = spreadNames(recent, normalizedLocale);
+    return recent.stream()
+        .map(reading -> mapper.toSummary(
+            reading,
+            shareIds.get(reading.getId()),
+            spreadNames.get(reading.getSpreadId())))
+        .toList();
   }
 
   @Transactional

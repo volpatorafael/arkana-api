@@ -7,8 +7,11 @@ import com.arkana.integration.PaymentProvider;
 import com.arkana.integration.efi.EfiProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -36,9 +39,16 @@ public abstract class BaseControllerIT extends BaseIT {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private CacheManager cacheManager;
+    @Autowired
+    @Qualifier("spreadCacheManager")
+    private CacheManager spreadCacheManager;
 
     @BeforeEach
     protected void configurePaymentProviders() {
+        clearCache("public-billing-plans");
+        clearCache(spreadCacheManager, "localized-spreads");
         when(abacatePayProvider.supportedPaymentMethods())
             .thenReturn(java.util.Set.of(BillingPaymentMethod.PIX_AUTOMATIC, BillingPaymentMethod.CARD));
         when(abacatePayProvider.requiresPlanMapping()).thenReturn(true);
@@ -52,6 +62,17 @@ public abstract class BaseControllerIT extends BaseIT {
         when(efiProvider.requiresPlanMapping(BillingPaymentMethod.CARD)).thenReturn(true);
         when(efiProvider.requiresPlanMapping(BillingPaymentMethod.PIX_AUTOMATIC)).thenReturn(false);
         when(efiProvider.supportsDeferredFirstCharge()).thenReturn(true);
+    }
+
+    private void clearCache(String name) {
+        clearCache(cacheManager, name);
+    }
+
+    private void clearCache(CacheManager manager, String name) {
+        Cache cache = manager.getCache(name);
+        if (cache != null) {
+            cache.clear();
+        }
     }
 
     protected final ResultActions mockMvcPerform(MockHttpServletRequestBuilder requestBuilder) throws Exception {

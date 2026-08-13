@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface ClientRepository extends JpaRepository<Client, UUID> {
   Optional<Client> findByIdAndOwnerId(UUID id, UUID ownerId);
 
+  long countByOwnerIdAndArchivedAtIsNull(UUID ownerId);
+
   Page<Client> findAllByOwnerIdAndArchivedAtIsNull(UUID ownerId, Pageable pageable);
 
   Page<Client> findAllByOwnerIdAndArchivedAtIsNotNull(UUID ownerId, Pageable pageable);

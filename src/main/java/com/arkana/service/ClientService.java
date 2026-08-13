@@ -26,6 +26,10 @@ public class ClientService {
   private final ClientRepository repository;
   private final ClientMapper mapper;
 
+  long countActiveForAuthorizedUser(UUID userId) {
+    return repository.countByOwnerIdAndArchivedAtIsNull(userId);
+  }
+
   @Transactional(readOnly = true)
   public ClientPageResponse list(UUID userId, int page, int pageSize, boolean archived) {
     access.requireAccess(userId);
