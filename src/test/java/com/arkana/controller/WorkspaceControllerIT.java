@@ -57,7 +57,16 @@ class WorkspaceControllerIT extends BaseControllerIT {
         .andExpect(jsonPath("$.dashboard.activeClientCount").value(1))
         .andExpect(jsonPath("$.dashboard.inProgressReadingCount").value(1))
         .andExpect(jsonPath("$.dashboard.completedReadingCount").value(5))
-        .andExpect(jsonPath("$.dashboard.recentReadings", hasSize(5)));
+        .andExpect(jsonPath("$.dashboard.recentReadings", hasSize(5)))
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].id").isNotEmpty())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].spreadName").isNotEmpty())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].status").isNotEmpty())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].startedAt").isNotEmpty())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].clientId").doesNotExist())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].context").doesNotExist())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].readingShareId").doesNotExist())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].consultationFeeAmount").doesNotExist())
+        .andExpect(jsonPath("$.dashboard.recentReadings[0].analysisVideoUrl").doesNotExist());
   }
 
   @Test

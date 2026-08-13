@@ -18,8 +18,6 @@ public interface BillingAccountRepository extends JpaRepository<BillingAccount, 
   @Query("select account from BillingAccount account where account.ownerId = :ownerId")
   Optional<BillingAccount> findByOwnerIdForUpdate(@Param("ownerId") UUID ownerId);
 
-  boolean existsByOwnerId(UUID ownerId);
-
   boolean existsByTrialEmailFingerprint(String fingerprint);
 
 }

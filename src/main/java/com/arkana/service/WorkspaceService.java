@@ -1,14 +1,18 @@
 package com.arkana.service;
 
-import com.arkana.domain.ReadingStatus;
 import com.arkana.dto.billing.BillingOverview;
 import com.arkana.dto.billing.SubscriptionPlanResponse;
 import com.arkana.dto.profile.ProfileResponse;
-import com.arkana.dto.reading.ReadingSummaryResponse;
+import com.arkana.dto.workspace.DashboardRecentReadingResponse;
 import com.arkana.dto.workspace.DashboardSummaryResponse;
 import com.arkana.dto.workspace.WorkspaceBootstrapResponse;
 import com.arkana.mapper.WorkspaceMapper;
+import com.arkana.repository.DashboardCountsProjection;
+import com.arkana.repository.DashboardRecentReadingProjection;
+import com.arkana.repository.ReadingRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,8 +27,7 @@ public class WorkspaceService {
 
     private final ProfileService profiles;
     private final BillingService billing;
-    private final ClientService clients;
-    private final ReadingService readings;
+    private final ReadingRepository readings;
     private final WorkspaceMapper mapper;
 
     public WorkspaceBootstrapResponse bootstrap(
@@ -38,21 +41,17 @@ public class WorkspaceService {
         DashboardSummaryResponse dashboard = null;
 
         if (ACTIVE_ACCESS.equals(billingOverview.accessStatus())) {
-            long activeClientCount = clients.countActiveForAuthorizedUser(userId);
-            long inProgressReadingCount = readings.countActiveForAuthorizedUser(
-                userId,
-                ReadingStatus.IN_PROGRESS);
-            long completedReadingCount = readings.countActiveForAuthorizedUser(
-                userId,
-                ReadingStatus.COMPLETED);
-            List<ReadingSummaryResponse> recentReadings = readings.recentForAuthorizedUser(
-                userId,
-                5,
-                locale);
+            DashboardCountsProjection counts = readings.dashboardCounts(userId);
+            Pageable recentLimit = PageRequest.of(0, 5);
+            List<DashboardRecentReadingProjection> recentReadingRows =
+                readings.findDashboardRecentReadings(
+                    userId,
+                    locale == null ? "pt-BR" : locale,
+                    recentLimit);
+            List<DashboardRecentReadingResponse> recentReadings =
+                mapper.toRecentReadings(recentReadingRows);
             dashboard = mapper.toDashboard(
-                activeClientCount,
-                inProgressReadingCount,
-                completedReadingCount,
+                counts,
                 recentReadings);
         } else {
             plans = billing.eligiblePlans(userId);

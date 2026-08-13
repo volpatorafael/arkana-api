@@ -107,10 +107,16 @@ public class BillingService {
 
   @Transactional
   public BillingOverview startTrial(UUID ownerId) {
+    Optional<BillingAccount> existing = accounts.findByOwnerId(ownerId);
+    if (existing.isPresent()) {
+      return overview(existing.get());
+    }
+
     Profile profile = profiles.findByIdForUpdate(ownerId).orElseThrow(() ->
         new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found."));
-    if (accounts.existsByOwnerId(ownerId)) {
-      return overview(ownerId);
+    Optional<BillingAccount> concurrentlyCreated = accounts.findByOwnerId(ownerId);
+    if (concurrentlyCreated.isPresent()) {
+      return overview(concurrentlyCreated.get());
     }
 
     String emailFingerprint = fingerprint(profile.getEmail());
@@ -139,7 +145,7 @@ public class BillingService {
             .build())
         .toList();
     eligibilities.saveAll(granted);
-    return overview(ownerId);
+    return overview(account);
   }
 
   @Transactional(readOnly = true)
@@ -155,7 +161,10 @@ public class BillingService {
     if (account.isEmpty()) {
       return emptyOverview();
     }
-    BillingAccount value = account.get();
+    return overview(account.get());
+  }
+
+  private BillingOverview overview(BillingAccount value) {
     OffsetDateTime currentTime = now();
     BillingAccountStatus effectiveStatus;
     if (value.getStatus() == BillingAccountStatus.TRIALING
