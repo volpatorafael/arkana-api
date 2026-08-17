@@ -10,6 +10,7 @@ public record ReadingResponse(
     UUID readingShareId,
     String spreadId,
     String spreadName,
+    String deckId,
     String deckMode,
     String status,
     String title,

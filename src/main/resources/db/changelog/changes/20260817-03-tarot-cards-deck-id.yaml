@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260817-03-tarot-cards-deck-id
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: tarot_cards
+                columnName: deck_id
+      changes:
+        - addColumn:
+            tableName: tarot_cards
+            columns:
+              - column:
+                  name: deck_id
+                  type: varchar(40)
+        - sql:
+            sql: update public.tarot_cards set deck_id = 'rider-waite' where deck_id is null
+        - addNotNullConstraint:
+            tableName: tarot_cards
+            columnName: deck_id
+            columnDataType: varchar(40)
+        - addForeignKeyConstraint:
+            baseTableName: tarot_cards
+            baseColumnNames: deck_id
+            referencedTableName: decks
+            referencedColumnNames: id
+            constraintName: fk_tarot_cards_deck

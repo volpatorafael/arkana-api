@@ -1,5 +1,6 @@
 package com.arkana.service;
 
+import com.arkana.domain.Deck;
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
 import com.arkana.domain.ReadingDeckMode;
@@ -99,6 +100,10 @@ public class ReadingService {
         .ownerId(owner)
         .clientId(request.clientId())
         .spreadId(request.spreadId())
+        // TODO(multi-deck): deckId defaults to Rider-Waite while the frontend
+        // doesn't send it yet (Fase 4a/4b compatibility window). Once the
+        // deck selector ships, make this required and drop the default.
+        .deckId(request.deckId() == null ? Deck.DEFAULT_DECK_ID : request.deckId())
         .deckMode(deckMode)
         .status(ReadingStatus.IN_PROGRESS)
         .title(trim(request.title()))
@@ -403,7 +408,10 @@ public class ReadingService {
     }
     TarotCard card = cards.findById(cardId)
         .orElseThrow(() -> notFound("Card not found."));
-    if (reading.getDeckMode() == ReadingDeckMode.MAJOR && !"major".equals(card.getSuit())) {
+    if (!reading.getDeckId().equals(card.getDeckId())) {
+      throw badRequest("Card does not belong to this reading's deck.");
+    }
+    if (reading.getDeckMode() == ReadingDeckMode.MAJOR && !TarotCard.MAJOR_SUIT.equals(card.getSuit())) {
       throw badRequest("Card is not allowed in this deck.");
     }
   }

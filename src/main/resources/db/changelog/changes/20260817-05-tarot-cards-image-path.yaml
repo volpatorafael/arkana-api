@@ -1,0 +1,106 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260817-05-tarot-cards-image-path
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: tarot_cards
+                columnName: image_path
+      changes:
+        - addColumn:
+            tableName: tarot_cards
+            columns:
+              - column:
+                  name: image_path
+                  type: varchar(80)
+        - sql:
+            sql: |
+              update public.tarot_cards as t
+              set image_path = v.image_path
+              from (values
+                ('the-fool', '00-TheFool.png'),
+                ('the-magician', '01-TheMagician.png'),
+                ('the-high-priestess', '02-TheHighPriestess.png'),
+                ('the-empress', '03-TheEmpress.png'),
+                ('the-emperor', '04-TheEmperor.png'),
+                ('the-hierophant', '05-TheHierophant.png'),
+                ('the-lovers', '06-TheLovers.png'),
+                ('the-chariot', '07-TheChariot.png'),
+                ('strength', '08-Strength.png'),
+                ('the-hermit', '09-TheHermit.png'),
+                ('wheel-of-fortune', '10-WheelOfFortune.png'),
+                ('justice', '11-Justice.png'),
+                ('the-hanged-man', '12-TheHangedMan.png'),
+                ('death', '13-Death.png'),
+                ('temperance', '14-Temperance.png'),
+                ('the-devil', '15-TheDevil.png'),
+                ('the-tower', '16-TheTower.png'),
+                ('the-star', '17-TheStar.png'),
+                ('the-moon', '18-TheMoon.png'),
+                ('the-sun', '19-TheSun.png'),
+                ('judgement', '20-Judgement.png'),
+                ('the-world', '21-TheWorld.png'),
+                ('ace-of-cups', 'Cups01.png'),
+                ('two-of-cups', 'Cups02.png'),
+                ('three-of-cups', 'Cups03.png'),
+                ('four-of-cups', 'Cups04.png'),
+                ('five-of-cups', 'Cups05.png'),
+                ('six-of-cups', 'Cups06.png'),
+                ('seven-of-cups', 'Cups07.png'),
+                ('eight-of-cups', 'Cups08.png'),
+                ('nine-of-cups', 'Cups09.png'),
+                ('ten-of-cups', 'Cups10.png'),
+                ('page-of-cups', 'Cups11.png'),
+                ('knight-of-cups', 'Cups12.png'),
+                ('queen-of-cups', 'Cups13.png'),
+                ('king-of-cups', 'Cups14.png'),
+                ('ace-of-pentacles', 'Pentacles01.png'),
+                ('two-of-pentacles', 'Pentacles02.png'),
+                ('three-of-pentacles', 'Pentacles03.png'),
+                ('four-of-pentacles', 'Pentacles04.png'),
+                ('five-of-pentacles', 'Pentacles05.png'),
+                ('six-of-pentacles', 'Pentacles06.png'),
+                ('seven-of-pentacles', 'Pentacles07.png'),
+                ('eight-of-pentacles', 'Pentacles08.png'),
+                ('nine-of-pentacles', 'Pentacles09.png'),
+                ('ten-of-pentacles', 'Pentacles10.png'),
+                ('page-of-pentacles', 'Pentacles11.png'),
+                ('knight-of-pentacles', 'Pentacles12.png'),
+                ('queen-of-pentacles', 'Pentacles13.png'),
+                ('king-of-pentacles', 'Pentacles14.png'),
+                ('ace-of-swords', 'Swords01.png'),
+                ('two-of-swords', 'Swords02.png'),
+                ('three-of-swords', 'Swords03.png'),
+                ('four-of-swords', 'Swords04.png'),
+                ('five-of-swords', 'Swords05.png'),
+                ('six-of-swords', 'Swords06.png'),
+                ('seven-of-swords', 'Swords07.png'),
+                ('eight-of-swords', 'Swords08.png'),
+                ('nine-of-swords', 'Swords09.png'),
+                ('ten-of-swords', 'Swords10.png'),
+                ('page-of-swords', 'Swords11.png'),
+                ('knight-of-swords', 'Swords12.png'),
+                ('queen-of-swords', 'Swords13.png'),
+                ('king-of-swords', 'Swords14.png'),
+                ('ace-of-wands', 'Wands01.png'),
+                ('two-of-wands', 'Wands02.png'),
+                ('three-of-wands', 'Wands03.png'),
+                ('four-of-wands', 'Wands04.png'),
+                ('five-of-wands', 'Wands05.png'),
+                ('six-of-wands', 'Wands06.png'),
+                ('seven-of-wands', 'Wands07.png'),
+                ('eight-of-wands', 'Wands08.png'),
+                ('nine-of-wands', 'Wands09.png'),
+                ('ten-of-wands', 'Wands10.png'),
+                ('page-of-wands', 'Wands11.png'),
+                ('knight-of-wands', 'Wands12.png'),
+                ('queen-of-wands', 'Wands13.png'),
+                ('king-of-wands', 'Wands14.png')
+              ) as v(id, image_path)
+              where t.id = v.id
+        - addNotNullConstraint:
+            tableName: tarot_cards
+            columnName: image_path
+            columnDataType: varchar(80)

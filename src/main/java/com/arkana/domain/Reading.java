@@ -31,6 +31,8 @@ public class Reading {
   private UUID clientId;
   @Column(name = "spread_id", nullable = false, length = 80)
   private String spreadId;
+  @Column(name = "deck_id", nullable = false, length = 40)
+  private String deckId;
   @Column(name = "deck_mode", nullable = false, length = 8)
   @Enumerated(EnumType.STRING)
   private ReadingDeckMode deckMode;

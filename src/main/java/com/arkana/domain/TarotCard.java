@@ -18,12 +18,20 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TarotCard {
+  // Cross-deck sentinel: every deck's major-arcana track uses this suit
+  // value (not a closed enum — see the openapi.yaml note on TarotCard.suit).
+  public static final String MAJOR_SUIT = "major";
+
   @Id
   private String id;
+  @Column(name = "deck_id", nullable = false)
+  private String deckId;
   @Column(name = "card_number", nullable = false)
   private short cardNumber;
   @Column(nullable = false, length = 16)
   private String suit;
+  @Column(name = "image_path", nullable = false, length = 80)
+  private String imagePath;
   @Column(name = "name_pt_br", nullable = false)
   private String namePtBr;
   @Column(name = "name_en", nullable = false)

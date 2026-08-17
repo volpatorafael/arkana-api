@@ -1,7 +1,9 @@
 package com.arkana.service;
 
+import com.arkana.domain.Deck;
 import com.arkana.domain.ReadingDeckMode;
 import com.arkana.domain.TarotCard;
+import com.arkana.dto.catalog.DeckResponse;
 import com.arkana.dto.catalog.SpreadResponse;
 import com.arkana.dto.catalog.TarotCardResponse;
 import com.arkana.mapper.TarotCardMapper;
@@ -21,12 +23,17 @@ public class CatalogService {
   private final ProductAccessAuthorizer access;
   private final TarotCardRepository cards;
   private final TarotCardMapper cardMapper;
+  private final LocalizedDeckCatalogService localizedDecks;
   private final LocalizedSpreadCatalogService localizedSpreads;
 
   @Transactional(readOnly = true)
-  public List<TarotCardResponse> cards(UUID userId, String deckMode, String locale) {
+  public List<TarotCardResponse> cards(UUID userId, String deckMode, String deckId, String locale) {
     access.requireAccess(userId);
     String normalizedLocale = locale(locale);
+    // TODO(multi-deck): drop this default once the frontend always sends
+    // deckId (see Deck.DEFAULT_DECK_ID for the rest of the compatibility
+    // window this belongs to).
+    String normalizedDeckId = deckId == null ? Deck.DEFAULT_DECK_ID : deckId;
     ReadingDeckMode normalizedMode;
     try {
       normalizedMode = deckMode == null
@@ -36,9 +43,15 @@ public class CatalogService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deckMode must be FULL or MAJOR.");
     }
     List<TarotCard> rows = normalizedMode == ReadingDeckMode.MAJOR
-        ? cards.findAllBySuitOrderByCardNumberAsc("major")
-        : cards.findAllByOrderBySuitAscCardNumberAsc();
+        ? cards.findAllByDeckIdAndSuitOrderByCardNumberAsc(normalizedDeckId, TarotCard.MAJOR_SUIT)
+        : cards.findAllByDeckIdOrderBySuitAscCardNumberAsc(normalizedDeckId);
     return rows.stream().map(card -> cardMapper.toResponse(card, normalizedLocale)).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public List<DeckResponse> decks(UUID userId, String locale) {
+    access.requireAccess(userId);
+    return localizedDecks.decks(locale(locale));
   }
 
   @Transactional(readOnly = true)

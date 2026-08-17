@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260817-04-readings-deck-id
+      author: arkana
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: readings
+                columnName: deck_id
+      changes:
+        - addColumn:
+            tableName: readings
+            columns:
+              - column:
+                  name: deck_id
+                  type: varchar(40)
+        - sql:
+            sql: update public.readings set deck_id = 'rider-waite' where deck_id is null
+        - addNotNullConstraint:
+            tableName: readings
+            columnName: deck_id
+            columnDataType: varchar(40)
+        - addForeignKeyConstraint:
+            baseTableName: readings
+            baseColumnNames: deck_id
+            referencedTableName: decks
+            referencedColumnNames: id
+            constraintName: fk_readings_deck

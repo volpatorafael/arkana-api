@@ -13,6 +13,7 @@ import java.time.Duration;
 public class CacheConfig {
     public static final String PUBLIC_BILLING_PLANS = "public-billing-plans";
     public static final String LOCALIZED_SPREADS = "localized-spreads";
+    public static final String LOCALIZED_DECKS = "localized-decks";
 
     @Bean
     @Primary
@@ -27,6 +28,15 @@ public class CacheConfig {
     @Bean("spreadCacheManager")
     CacheManager spreadCacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager(LOCALIZED_SPREADS);
+        manager.setCaffeine(Caffeine.newBuilder()
+            .maximumSize(30)
+            .expireAfterWrite(Duration.ofHours(2)));
+        return manager;
+    }
+
+    @Bean("deckCacheManager")
+    CacheManager deckCacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager(LOCALIZED_DECKS);
         manager.setCaffeine(Caffeine.newBuilder()
             .maximumSize(30)
             .expireAfterWrite(Duration.ofHours(2)));

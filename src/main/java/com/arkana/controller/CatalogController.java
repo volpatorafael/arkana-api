@@ -1,5 +1,6 @@
 package com.arkana.controller;
 
+import com.arkana.dto.catalog.DeckResponse;
 import com.arkana.dto.catalog.SpreadResponse;
 import com.arkana.dto.catalog.TarotCardResponse;
 import com.arkana.security.CurrentUser;
@@ -26,8 +27,16 @@ public class CatalogController {
   List<TarotCardResponse> cards(
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(required = false) String deckMode,
+      @RequestParam(required = false) String deckId,
       @RequestParam(required = false) String locale) {
-    return catalog.cards(currentUser.id(jwt), deckMode, locale);
+    return catalog.cards(currentUser.id(jwt), deckMode, deckId, locale);
+  }
+
+  @GetMapping("/decks")
+  List<DeckResponse> decks(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false) String locale) {
+    return catalog.decks(currentUser.id(jwt), locale);
   }
 
   @GetMapping("/spreads")

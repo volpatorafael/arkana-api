@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface TarotCardRepository extends JpaRepository<TarotCard, String> {
-  List<TarotCard> findAllByOrderBySuitAscCardNumberAsc();
+  List<TarotCard> findAllByDeckIdOrderBySuitAscCardNumberAsc(String deckId);
 
-  List<TarotCard> findAllBySuitOrderByCardNumberAsc(String suit);
+  List<TarotCard> findAllByDeckIdAndSuitOrderByCardNumberAsc(String deckId, String suit);
 }

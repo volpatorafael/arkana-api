@@ -13,6 +13,7 @@ import com.arkana.domain.BillingProviderPlanMapping;
 import com.arkana.domain.BillingProviderSubscription;
 import com.arkana.domain.BillingProviderSubscriptionStatus;
 import com.arkana.domain.Client;
+import com.arkana.domain.Deck;
 import com.arkana.domain.Profile;
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
@@ -27,6 +28,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -148,6 +150,7 @@ public final class TestDataGenerator {
                 "advice",
                 "aphrodite",
                 "goals")))
+            .deckId(Deck.DEFAULT_DECK_ID)
             .deckMode(randomValue(List.of(ReadingDeckMode.values())))
             .status(randomValue(List.of(ReadingStatus.values())))
             .title("Reading " + id)
@@ -198,19 +201,25 @@ public final class TestDataGenerator {
             .accessCount(ThreadLocalRandom.current().nextLong(0, 10_000));
     }
 
+    // Truncated to seconds: sub-second precision has no test value here and
+    // caused flaky JSON-path assertions (Jackson and OffsetDateTime#toString
+    // don't always agree on trailing-zero fractional digits, e.g.
+    // ".989090Z" vs ".98909Z" for the same instant).
     private static OffsetDateTime randomDate() {
         long randomDays = ThreadLocalRandom.current().nextLong(-365, 366);
-        return OffsetDateTime.now(ZoneOffset.UTC).plusDays(randomDays);
+        return OffsetDateTime.now(ZoneOffset.UTC).plusDays(randomDays).truncatedTo(ChronoUnit.SECONDS);
     }
 
     private static OffsetDateTime randomPastDate() {
         return OffsetDateTime.now(ZoneOffset.UTC)
-            .minusDays(ThreadLocalRandom.current().nextLong(1, 366));
+            .minusDays(ThreadLocalRandom.current().nextLong(1, 366))
+            .truncatedTo(ChronoUnit.SECONDS);
     }
 
     private static OffsetDateTime randomFutureDate() {
         return OffsetDateTime.now(ZoneOffset.UTC)
-            .plusDays(ThreadLocalRandom.current().nextLong(1, 366));
+            .plusDays(ThreadLocalRandom.current().nextLong(1, 366))
+            .truncatedTo(ChronoUnit.SECONDS);
     }
 
     private static String randomText(String prefix) {

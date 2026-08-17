@@ -9,7 +9,11 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
-public record CreateReadingRequest(UUID clientId, @NotBlank String spreadId, @NotBlank String deckMode,
+// TODO(multi-deck): deckId is optional while the frontend doesn't send it yet
+// (Fase 4a/4b compatibility window). Once the deck selector ships, make it
+// @NotBlank like spreadId and deckMode.
+public record CreateReadingRequest(UUID clientId, @NotBlank String spreadId, String deckId,
+                                   @NotBlank String deckMode,
                                    @Size(max = 200) String title, @Size(max = 5000) String question,
                                    @Size(max = 10000) String context,
                                    @PositiveOrZero Integer consultationFeeAmount,
