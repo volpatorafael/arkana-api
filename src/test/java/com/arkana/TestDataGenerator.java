@@ -175,6 +175,7 @@ public final class TestDataGenerator {
             .x(BigDecimal.valueOf(ThreadLocalRandom.current().nextDouble(0, 100)))
             .y(BigDecimal.valueOf(ThreadLocalRandom.current().nextDouble(0, 100)))
             .rotation((short) ThreadLocalRandom.current().nextInt(-180, 181))
+            .stackOrder(ThreadLocalRandom.current().nextInt(1, 1000))
             .createdAt(randomDate())
             .updatedAt(randomDate());
     }

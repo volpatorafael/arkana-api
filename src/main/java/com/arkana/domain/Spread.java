@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
@@ -48,6 +50,10 @@ public class Spread {
   private String useCaseEn;
   @Column(name = "position_count", nullable = false)
   private short positionCount;
+  @Builder.Default
+  @Column(nullable = false, length = 16)
+  @Enumerated(EnumType.STRING)
+  private SpreadKind kind = SpreadKind.STRUCTURED;
   @Column(nullable = false)
   private boolean active;
 

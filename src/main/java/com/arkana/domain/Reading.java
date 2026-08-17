@@ -49,7 +49,8 @@ public class Reading {
   private Integer consultationFeeAmount;
   @Builder.Default
   @Column(name = "consultation_fee_currency", nullable = false, length = 3)
-  private String consultationFeeCurrency = "BRL";
+  @Enumerated(EnumType.STRING)
+  private CurrencyCode consultationFeeCurrency = CurrencyCode.BRL;
   @Column(name = "consultation_duration_minutes")
   private Integer consultationDurationMinutes;
   @Column(name = "analysis_video_url", length = 2048)

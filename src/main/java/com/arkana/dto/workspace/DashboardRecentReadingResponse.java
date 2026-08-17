@@ -1,5 +1,7 @@
 package com.arkana.dto.workspace;
 
+import com.arkana.domain.ReadingStatus;
+
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -8,6 +10,6 @@ public record DashboardRecentReadingResponse(
         String title,
         String question,
         String spreadName,
-        String status,
+        ReadingStatus status,
         OffsetDateTime startedAt) {
 }

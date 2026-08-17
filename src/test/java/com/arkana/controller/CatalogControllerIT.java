@@ -71,7 +71,7 @@ class CatalogControllerIT extends BaseControllerIT {
     void shouldReturnLocalizedMarseilleDeckAndItsOwnCardCatalog() throws Exception {
         mockMvcPerform(get("/v1/decks?locale=pt-BR").with(authenticatedAs(firstUser)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(2)))
+            .andExpect(jsonPath("$", hasSize(3)))
             .andExpect(jsonPath("$[1].id").value("marseille"))
             .andExpect(jsonPath("$[1].name").value("Tarot de Marselha"))
             .andExpect(jsonPath("$[1].cardCount").value(78));
@@ -97,10 +97,38 @@ class CatalogControllerIT extends BaseControllerIT {
     }
 
     @Test
+    void shouldReturnLocalizedZenDeckAndItsOriginalCardCatalog() throws Exception {
+        mockMvcPerform(get("/v1/decks?locale=pt-BR").with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[2].id").value("zen"))
+            .andExpect(jsonPath("$[2].name").value("Baralho Zen"))
+            .andExpect(jsonPath("$[2].cardCount").value(79));
+
+        mockMvcPerform(get("/v1/cards?deckId=zen&deckMode=FULL&locale=en")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(79)))
+            .andExpect(jsonPath("$[0].deckId").value("zen"));
+
+        mockMvcPerform(get("/v1/cards?deckId=zen&deckMode=MAJOR&locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(23)))
+            .andExpect(jsonPath("$[8].id").value("zen-courage"))
+            .andExpect(jsonPath("$[8].name").value("Coragem"))
+            .andExpect(jsonPath("$[17].id").value("zen-silence"))
+            .andExpect(jsonPath("$[22].id").value("zen-witness"));
+    }
+
+    @Test
     void shouldReturnSharedSpreadCatalogOnlyToUsersWithProductAccess() throws Exception {
         String firstResponse = mockMvcPerform(get("/v1/spreads?locale=en").with(authenticatedAs(firstUser)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$", hasSize(12)))
+            .andExpect(jsonPath("$", hasSize(13)))
+            .andExpect(jsonPath("$[12].id").value("free"))
+            .andExpect(jsonPath("$[12].kind").value("FREEFORM"))
+            .andExpect(jsonPath("$[12].positionCount").value(0))
+            .andExpect(jsonPath("$[12].positions", hasSize(0)))
             .andReturn().getResponse().getContentAsString();
         String secondResponse = mockMvcPerform(get("/v1/spreads?locale=en").with(authenticatedAs(secondUser)))
             .andExpect(status().isOk())

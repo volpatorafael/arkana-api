@@ -1,5 +1,7 @@
 package com.arkana.dto.catalog;
 
+import com.arkana.domain.SpreadKind;
+
 import java.util.List;
 
 public record SpreadResponse(
@@ -8,6 +10,7 @@ public record SpreadResponse(
     String shortDescription,
     String description,
     String useCase,
+    SpreadKind kind,
     int positionCount,
     boolean active,
     List<SpreadPositionResponse> positions) {

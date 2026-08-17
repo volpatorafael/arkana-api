@@ -1,5 +1,6 @@
 package com.arkana.controller;
 
+import com.arkana.dto.reading.CreateFreeformReadingPositionRequest;
 import com.arkana.dto.reading.CreateReadingRequest;
 import com.arkana.dto.reading.ReadingCommentResponse;
 import com.arkana.dto.reading.ReadingPageResponse;
@@ -7,6 +8,7 @@ import com.arkana.dto.reading.ReadingPositionResponse;
 import com.arkana.dto.reading.ReadingResponse;
 import com.arkana.dto.reading.SaveReadingCommentRequest;
 import com.arkana.dto.reading.SaveReadingPositionRequest;
+import com.arkana.dto.reading.UpdateFreeformReadingPositionLayoutRequest;
 import com.arkana.dto.reading.UpdateReadingRequest;
 import com.arkana.security.CurrentUser;
 import com.arkana.service.ReadingService;
@@ -94,6 +96,36 @@ public class ReadingController {
       @Valid @RequestBody SaveReadingPositionRequest body,
       @RequestParam(required = false) String locale) {
     return readings.savePosition(currentUser.id(jwt), id, positionId, body, locale);
+  }
+
+  @PostMapping("/{id}/positions")
+  ResponseEntity<ReadingPositionResponse> createPosition(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable UUID id,
+      @Valid @RequestBody CreateFreeformReadingPositionRequest body,
+      @RequestParam(required = false) String locale) {
+    return ResponseEntity.status(201).body(
+        readings.createFreeformPosition(currentUser.id(jwt), id, body, locale));
+  }
+
+  @PatchMapping("/{id}/positions/{positionId}")
+  ReadingPositionResponse updatePositionLayout(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable UUID id,
+      @PathVariable UUID positionId,
+      @Valid @RequestBody UpdateFreeformReadingPositionLayoutRequest body,
+      @RequestParam(required = false) String locale) {
+    return readings.updateFreeformPositionLayout(
+        currentUser.id(jwt), id, positionId, body, locale);
+  }
+
+  @DeleteMapping("/{id}/positions/{positionId}")
+  ResponseEntity<Void> deletePosition(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable UUID id,
+      @PathVariable UUID positionId) {
+    readings.deleteFreeformPosition(currentUser.id(jwt), id, positionId);
+    return ResponseEntity.noContent().build();
   }
 
   @PostMapping("/{id}/complete")

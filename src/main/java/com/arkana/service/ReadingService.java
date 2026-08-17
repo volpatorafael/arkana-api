@@ -1,5 +1,6 @@
 package com.arkana.service;
 
+import com.arkana.domain.CurrencyCode;
 import com.arkana.domain.Deck;
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
@@ -9,7 +10,9 @@ import com.arkana.domain.ReadingShare;
 import com.arkana.domain.ReadingShareStatus;
 import com.arkana.domain.ReadingStatus;
 import com.arkana.domain.Spread;
+import com.arkana.domain.SpreadKind;
 import com.arkana.domain.TarotCard;
+import com.arkana.dto.reading.CreateFreeformReadingPositionRequest;
 import com.arkana.dto.reading.CreateReadingRequest;
 import com.arkana.dto.reading.ReadingCommentResponse;
 import com.arkana.dto.reading.ReadingPageResponse;
@@ -17,6 +20,7 @@ import com.arkana.dto.reading.ReadingPositionResponse;
 import com.arkana.dto.reading.ReadingResponse;
 import com.arkana.dto.reading.SaveReadingCommentRequest;
 import com.arkana.dto.reading.SaveReadingPositionRequest;
+import com.arkana.dto.reading.UpdateFreeformReadingPositionLayoutRequest;
 import com.arkana.dto.reading.UpdateReadingRequest;
 import com.arkana.mapper.ReadingMapper;
 import com.arkana.mapper.ReadingCommentMapper;
@@ -42,6 +46,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
@@ -89,7 +94,7 @@ public class ReadingService {
   @Transactional
   public ReadingResponse create(UUID owner, CreateReadingRequest request, String locale) {
     access.requireAccess(owner);
-    ReadingDeckMode deckMode = deckMode(request.deckMode());
+    ReadingDeckMode deckMode = request.deckMode();
     requireSpread(request.spreadId());
     requireClient(owner, request.clientId());
     String analysisVideoUrl = analysisVideoUrl(request.analysisVideoUrl());
@@ -110,7 +115,7 @@ public class ReadingService {
         .question(trim(request.question()))
         .context(trim(request.context()))
         .consultationFeeAmount(request.consultationFeeAmount())
-        .consultationFeeCurrency("BRL")
+        .consultationFeeCurrency(CurrencyCode.BRL)
         .consultationDurationMinutes(request.consultationDurationMinutes())
         .analysisVideoUrl(analysisVideoUrl)
         .startedAt(createdAt)
@@ -208,7 +213,7 @@ public class ReadingService {
       if (request.deckMode() == null) {
         throw badRequest("deckMode cannot be null.");
       }
-      deckMode = deckMode(request.deckMode());
+      deckMode = request.deckMode();
     }
     if (request.clientPresent()) {
       requireClient(owner, request.clientId());
@@ -253,16 +258,17 @@ public class ReadingService {
     if ((request.cardId() == null) != (request.orientation() == null)) {
       throw badRequest("cardId and orientation must both be set or cleared.");
     }
-    if (request.orientation() != null
-        && !List.of("UPRIGHT", "REVERSED").contains(request.orientation())) {
-      throw badRequest("Invalid orientation.");
-    }
-
     ReadingPosition position = positions.findByIdAndReadingId(positionId, readingId)
         .orElseThrow(() -> notFound("Reading position not found."));
+    Spread spread = spread(reading);
+    if (spread.getKind() == SpreadKind.FREEFORM && request.cardId() == null) {
+      throw badRequest("Freeform positions must be removed instead of cleared.");
+    }
     boolean cardChanging = !Objects.equals(request.cardId(), position.getCardId())
         || !Objects.equals(request.orientation(), position.getOrientation());
-    if (cardChanging && reading.getStatus() != ReadingStatus.IN_PROGRESS) {
+    if (cardChanging
+        && reading.getStatus() != ReadingStatus.IN_PROGRESS
+        && spread.getKind() != SpreadKind.FREEFORM) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Card assignment is locked after completion.");
     }
     validateCardForDeck(reading, request.cardId());
@@ -283,9 +289,106 @@ public class ReadingService {
   }
 
   @Transactional
+  public ReadingPositionResponse createFreeformPosition(
+      UUID owner,
+      UUID readingId,
+      CreateFreeformReadingPositionRequest request,
+      String locale) {
+    access.requireAccess(owner);
+    Reading reading = readingForUpdate(owner, readingId);
+    requireFreeform(reading);
+    validateCardForDeck(reading, request.cardId());
+    if (positions.existsByReadingIdAndCardId(readingId, request.cardId())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "A card can only be used once per reading.");
+    }
+
+    List<ReadingPosition> current = positions.findAllByReadingIdOrderByPositionOrderAsc(readingId);
+    short order = firstAvailableOrder(current);
+    int stackOrder = current.stream()
+        .mapToInt(ReadingPosition::getStackOrder)
+        .max()
+        .orElse(0) + 1;
+    OffsetDateTime createdAt = now();
+    ReadingPosition position = positions.save(ReadingPosition.builder()
+        .id(UUID.randomUUID())
+        .readingId(readingId)
+        .positionKey("card-" + order)
+        .positionOrder(order)
+        .namePtBr("Carta " + order)
+        .nameEn("Card " + order)
+        .meaningPtBr("")
+        .meaningEn("")
+        .x(new BigDecimal("50.00"))
+        .y(new BigDecimal("50.00"))
+        .rotation((short) 0)
+        .stackOrder(stackOrder)
+        .cardId(request.cardId())
+        .orientation(request.orientation())
+        .createdAt(createdAt)
+        .updatedAt(createdAt)
+        .build());
+    try {
+      positions.flush();
+    } catch (DataIntegrityViolationException exception) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "A card can only be used once per reading.");
+    }
+    TarotCard card = cards.findById(request.cardId()).orElseThrow();
+    return positionMapper.toResponse(position, card, locale);
+  }
+
+  @Transactional
+  public ReadingPositionResponse updateFreeformPositionLayout(
+      UUID owner,
+      UUID readingId,
+      UUID positionId,
+      UpdateFreeformReadingPositionLayoutRequest request,
+      String locale) {
+    access.requireAccess(owner);
+    Reading reading = readingForUpdate(owner, readingId);
+    requireFreeform(reading);
+    if (!request.any()) {
+      throw badRequest("At least one layout field must be provided.");
+    }
+    if (request.rotation() != null && request.rotation() % 45 != 0) {
+      throw badRequest("rotation must be a multiple of 45 degrees.");
+    }
+    ReadingPosition position = positions.findByIdAndReadingId(positionId, readingId)
+        .orElseThrow(() -> notFound("Reading position not found."));
+    int nextStackOrder = positions.findAllByReadingIdOrderByPositionOrderAsc(readingId).stream()
+        .mapToInt(ReadingPosition::getStackOrder)
+        .max()
+        .orElse(0) + 1;
+    position.updateLayout(
+        request.x() == null ? position.getX() : request.x(),
+        request.y() == null ? position.getY() : request.y(),
+        request.rotation() == null ? position.getRotation() : request.rotation(),
+        nextStackOrder,
+        now());
+    TarotCard card = cards.findById(position.getCardId()).orElseThrow();
+    return positionMapper.toResponse(position, card, locale);
+  }
+
+  @Transactional
+  public void deleteFreeformPosition(UUID owner, UUID readingId, UUID positionId) {
+    access.requireAccess(owner);
+    Reading reading = readingForUpdate(owner, readingId);
+    requireFreeform(reading);
+    ReadingPosition position = positions.findByIdAndReadingId(positionId, readingId)
+        .orElseThrow(() -> notFound("Reading position not found."));
+    positions.delete(position);
+  }
+
+  @Transactional
   public ReadingResponse complete(UUID owner, UUID id, String locale) {
     access.requireAccess(owner);
     Reading reading = requireInProgress(owner, id);
+    Spread spread = spread(reading);
+    if (spread.getKind() == SpreadKind.FREEFORM
+        && positions.findAllByReadingIdOrderByPositionOrderAsc(id).isEmpty()) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "A freeform reading must have at least one card before completion.");
+    }
     long incomplete = positions.countByReadingIdAndCardIdIsNull(id);
     if (incomplete > 0) {
       throw new ResponseStatusException(
@@ -372,7 +475,16 @@ public class ReadingService {
     if (spreadId == null) {
       throw badRequest("spreadId cannot be null.");
     }
-    requireSpread(spreadId);
+    if (reading.getSpreadId().equals(spreadId)) {
+      return;
+    }
+    Spread currentSpread = spread(reading);
+    Spread nextSpread = requireSpread(spreadId);
+    if (currentSpread.getKind() != nextSpread.getKind()) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "Reading type cannot be changed after creation.");
+    }
     positions.deleteAllByReadingId(reading.getId());
     positions.flush();
     copySpreadPositions(reading.getId(), spreadId, now());
@@ -395,6 +507,7 @@ public class ReadingService {
             .x(position.getX())
             .y(position.getY())
             .rotation(position.getRotation())
+            .stackOrder(position.getPositionOrder())
             .createdAt(createdAt)
             .updatedAt(createdAt)
             .build())
@@ -421,6 +534,34 @@ public class ReadingService {
         .orElseThrow(() -> notFound("Reading not found."));
   }
 
+  private Reading readingForUpdate(UUID owner, UUID id) {
+    return readings.findByIdAndOwnerIdForUpdate(id, owner)
+        .orElseThrow(() -> notFound("Reading not found."));
+  }
+
+  private Spread spread(Reading reading) {
+    return spreads.findById(reading.getSpreadId())
+        .orElseThrow(() -> notFound("Spread not found."));
+  }
+
+  private void requireFreeform(Reading reading) {
+    if (spread(reading).getKind() != SpreadKind.FREEFORM) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "This operation is only available for freeform readings.");
+    }
+  }
+
+  private short firstAvailableOrder(List<ReadingPosition> current) {
+    for (short candidate = 1; candidate < Short.MAX_VALUE; candidate++) {
+      short value = candidate;
+      if (current.stream().noneMatch(position -> position.getPositionOrder() == value)) {
+        return candidate;
+      }
+    }
+    throw new ResponseStatusException(HttpStatus.CONFLICT, "No free position number is available.");
+  }
+
   private Reading requireInProgress(UUID owner, UUID id) {
     Reading reading = reading(owner, id);
     if (reading.getStatus() != ReadingStatus.IN_PROGRESS) {
@@ -438,14 +579,6 @@ public class ReadingService {
   private Spread requireSpread(String id) {
     return spreads.findByIdAndActiveTrue(id)
         .orElseThrow(() -> notFound("Spread not found."));
-  }
-
-  private ReadingDeckMode deckMode(String value) {
-    try {
-      return ReadingDeckMode.valueOf(value);
-    } catch (IllegalArgumentException | NullPointerException exception) {
-      throw badRequest("Invalid deck mode.");
-    }
   }
 
   private ReadingStatus readingStatus(String value) {

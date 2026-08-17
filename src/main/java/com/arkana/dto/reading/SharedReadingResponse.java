@@ -1,5 +1,7 @@
 package com.arkana.dto.reading;
 
+import com.arkana.domain.ReadingDeckMode;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -9,7 +11,7 @@ public record SharedReadingResponse(
     String title,
     String question,
     ReadingSpreadSummaryResponse spread,
-    String deckMode,
+    ReadingDeckMode deckMode,
     String analysisVideoUrl,
     OffsetDateTime startedAt,
     OffsetDateTime completedAt,

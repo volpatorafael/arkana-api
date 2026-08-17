@@ -1,5 +1,9 @@
 package com.arkana.dto.reading;
 
+import com.arkana.domain.CurrencyCode;
+import com.arkana.domain.ReadingDeckMode;
+import com.arkana.domain.ReadingStatus;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -11,13 +15,13 @@ public record ReadingResponse(
     String spreadId,
     String spreadName,
     String deckId,
-    String deckMode,
-    String status,
+    ReadingDeckMode deckMode,
+    ReadingStatus status,
     String title,
     String question,
     String context,
     Integer consultationFeeAmount,
-    String consultationFeeCurrency,
+    CurrencyCode consultationFeeCurrency,
     Integer consultationDurationMinutes,
     String analysisVideoUrl,
     OffsetDateTime startedAt,

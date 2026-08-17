@@ -13,9 +13,11 @@ import java.util.List;
 @Mapper
 public interface SpreadMapper {
   @Mapping(target = "name", source = "namePtBr")
+  @Mapping(target = "kind", source = "kind")
   ReadingSpreadSummaryResponse toSummaryResponse(Spread spread);
 
   @Mapping(target = "name", expression = "java(name(spread, locale))")
+  @Mapping(target = "kind", source = "kind")
   ReadingSpreadSummaryResponse toSummaryResponse(Spread spread, @Context String locale);
 
   @Mapping(target = "id", source = "spread.id")
@@ -23,6 +25,7 @@ public interface SpreadMapper {
   @Mapping(target = "shortDescription", expression = "java(shortDescription(spread, locale))")
   @Mapping(target = "description", expression = "java(description(spread, locale))")
   @Mapping(target = "useCase", expression = "java(useCase(spread, locale))")
+  @Mapping(target = "kind", source = "spread.kind")
   @Mapping(target = "positionCount", source = "spread.positionCount")
   @Mapping(target = "active", source = "spread.active")
   @Mapping(target = "positions", source = "positions")

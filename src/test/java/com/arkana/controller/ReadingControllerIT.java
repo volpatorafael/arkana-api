@@ -1,6 +1,8 @@
 package com.arkana.controller;
 
+import com.arkana.domain.CardOrientation;
 import com.arkana.domain.Client;
+import com.arkana.domain.CurrencyCode;
 import com.arkana.domain.Profile;
 import com.arkana.domain.Reading;
 import com.arkana.domain.ReadingComment;
@@ -155,7 +157,7 @@ class ReadingControllerIT extends BaseControllerIT {
         Reading created = readingRepository.findById(createdId).orElseThrow();
         assertThat(created.getOwnerId()).isEqualTo(firstUser.getId());
         assertThat(created.getConsultationFeeAmount()).isEqualTo(15000);
-        assertThat(created.getConsultationFeeCurrency()).isEqualTo("BRL");
+        assertThat(created.getConsultationFeeCurrency()).isEqualTo(CurrencyCode.BRL);
         assertThat(created.getConsultationDurationMinutes()).isEqualTo(90);
         assertThat(created.getAnalysisVideoUrl())
             .isEqualTo("https://www.youtube.com/watch?v=abc123");
@@ -325,7 +327,11 @@ class ReadingControllerIT extends BaseControllerIT {
         Reading firstReading = reading(firstUser);
         Reading secondReading = reading(secondUser);
         ReadingPosition firstPosition = position(firstReading);
-        firstPosition.update("the-fool", "UPRIGHT", null, java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        firstPosition.update(
+            "the-fool",
+            CardOrientation.UPRIGHT,
+            null,
+            java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
         positionRepository.flush();
 
         mockMvcPerform(post("/v1/readings/{id}/complete", firstReading.getId())

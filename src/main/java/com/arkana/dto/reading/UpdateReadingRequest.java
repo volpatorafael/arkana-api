@@ -1,5 +1,6 @@
 package com.arkana.dto.reading;
 
+import com.arkana.domain.ReadingDeckMode;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -12,7 +13,8 @@ import java.util.UUID;
 
 public final class UpdateReadingRequest {
   private UUID clientId;
-  private String spreadId, deckMode;
+  private String spreadId;
+  private ReadingDeckMode deckMode;
   @Size(max = 200)
   private String title;
   @Size(max = 5000)
@@ -45,7 +47,7 @@ public final class UpdateReadingRequest {
   }
 
   @JsonSetter
-  public void setDeckMode(String value) {
+  public void setDeckMode(ReadingDeckMode value) {
     deckMode = value;
     deckPresent = true;
   }
@@ -100,7 +102,7 @@ public final class UpdateReadingRequest {
     return spreadId;
   }
 
-  public String deckMode() {
+  public ReadingDeckMode deckMode() {
     return deckMode;
   }
 

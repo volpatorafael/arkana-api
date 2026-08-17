@@ -2,6 +2,8 @@ package com.arkana.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -26,7 +28,7 @@ public class ReadingPosition {
   private UUID id;
   @Column(name = "reading_id", nullable = false)
   private UUID readingId;
-  @Column(name = "spread_position_id", nullable = false)
+  @Column(name = "spread_position_id")
   private UUID spreadPositionId;
   @Column(name = "position_key", nullable = false, length = 80)
   private String positionKey;
@@ -46,10 +48,13 @@ public class ReadingPosition {
   private BigDecimal y;
   @Column(nullable = false)
   private short rotation;
+  @Column(name = "stack_order", nullable = false)
+  private int stackOrder;
   @Column(name = "card_id", length = 80)
   private String cardId;
   @Column(length = 16)
-  private String orientation;
+  @Enumerated(EnumType.STRING)
+  private CardOrientation orientation;
   @Column(length = 10000)
   private String interpretation;
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -57,10 +62,27 @@ public class ReadingPosition {
   @Column(name = "updated_at", nullable = false)
   private OffsetDateTime updatedAt;
 
-  public void update(String cardId, String orientation, String interpretation, OffsetDateTime updatedAt) {
+  public void update(
+      String cardId,
+      CardOrientation orientation,
+      String interpretation,
+      OffsetDateTime updatedAt) {
     this.cardId = cardId;
     this.orientation = orientation;
     this.interpretation = interpretation;
+    this.updatedAt = updatedAt;
+  }
+
+  public void updateLayout(
+      BigDecimal x,
+      BigDecimal y,
+      short rotation,
+      int stackOrder,
+      OffsetDateTime updatedAt) {
+    this.x = x;
+    this.y = y;
+    this.rotation = rotation;
+    this.stackOrder = stackOrder;
     this.updatedAt = updatedAt;
   }
 

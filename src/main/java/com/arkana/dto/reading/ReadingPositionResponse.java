@@ -1,5 +1,7 @@
 package com.arkana.dto.reading;
 
+import com.arkana.domain.CardOrientation;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -13,8 +15,9 @@ public record ReadingPositionResponse(
     BigDecimal x,
     BigDecimal y,
     short rotation,
+    int stackOrder,
     TarotCardSummaryResponse card,
-    String orientation,
+    CardOrientation orientation,
     String interpretation,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt) {

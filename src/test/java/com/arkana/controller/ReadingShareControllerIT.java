@@ -1,5 +1,6 @@
 package com.arkana.controller;
 
+import com.arkana.domain.CardOrientation;
 import com.arkana.domain.Client;
 import com.arkana.domain.Profile;
 import com.arkana.domain.Reading;
@@ -179,6 +180,7 @@ class ReadingShareControllerIT extends BaseControllerIT {
                 .andExpect(jsonPath("$.positions[0].x").isNumber())
                 .andExpect(jsonPath("$.positions[0].y").isNumber())
                 .andExpect(jsonPath("$.positions[0].rotation").isNumber())
+                .andExpect(jsonPath("$.positions[0].stackOrder").isNumber())
                 .andExpect(jsonPath("$.positions[0].card.id").value("the-fool"))
                 .andExpect(jsonPath("$.positions[0].card.number").value(0))
                 .andExpect(jsonPath("$.positions[0].card.suit").value("major"))
@@ -341,7 +343,11 @@ class ReadingShareControllerIT extends BaseControllerIT {
         ReadingPosition position = positionRepository
             .findAllByReadingIdOrderByPositionOrderAsc(reading.getId())
             .getFirst();
-        position.update("the-fool", "UPRIGHT", "Interpretacao publica", now());
+        position.update(
+            "the-fool",
+            CardOrientation.UPRIGHT,
+            "Interpretacao publica",
+            now());
         positionRepository.saveAndFlush(position);
         return reading;
     }

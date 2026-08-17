@@ -155,8 +155,10 @@ class ApiMigrationIntegrationTest extends BaseControllerIT {
 
     mvc.perform(get("/v1/spreads").with(user(USER_ONE)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(12)))
-        .andExpect(jsonPath("$[0].positions").isArray());
+        .andExpect(jsonPath("$", hasSize(13)))
+        .andExpect(jsonPath("$[0].positions").isArray())
+        .andExpect(jsonPath("$[12].kind").value("FREEFORM"))
+        .andExpect(jsonPath("$[12].positions", hasSize(0)));
   }
 
   @Test
