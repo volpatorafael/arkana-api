@@ -61,6 +61,42 @@ class CatalogControllerIT extends BaseControllerIT {
     }
 
     @Test
+    void shouldRejectInvalidDeckModeThroughTypedRequestBinding() throws Exception {
+        mockMvcPerform(get("/v1/cards?deckMode=major")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnLocalizedMarseilleDeckAndItsOwnCardCatalog() throws Exception {
+        mockMvcPerform(get("/v1/decks?locale=pt-BR").with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(2)))
+            .andExpect(jsonPath("$[1].id").value("marseille"))
+            .andExpect(jsonPath("$[1].name").value("Tarot de Marselha"))
+            .andExpect(jsonPath("$[1].cardCount").value(78));
+
+        mockMvcPerform(get("/v1/cards?deckId=marseille&deckMode=FULL&locale=en")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(78)))
+            .andExpect(jsonPath("$[0].deckId").value("marseille"))
+            .andExpect(jsonPath("$[0].imagePath").value("Coupes01.png"))
+            .andExpect(jsonPath("$[10].name").value("Page of Cups"))
+            .andExpect(jsonPath("$[10].imagePath").value("Coupes12.png"))
+            .andExpect(jsonPath("$[11].name").value("Knight of Cups"))
+            .andExpect(jsonPath("$[11].imagePath").value("Coupes11.png"));
+
+        mockMvcPerform(get("/v1/cards?deckId=marseille&deckMode=MAJOR&locale=pt-BR")
+                .with(authenticatedAs(firstUser)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(22)))
+            .andExpect(jsonPath("$[8].id").value("marseille-la-justice"))
+            .andExpect(jsonPath("$[8].name").value("A Justiça"))
+            .andExpect(jsonPath("$[11].id").value("marseille-la-force"));
+    }
+
+    @Test
     void shouldReturnSharedSpreadCatalogOnlyToUsersWithProductAccess() throws Exception {
         String firstResponse = mockMvcPerform(get("/v1/spreads?locale=en").with(authenticatedAs(firstUser)))
             .andExpect(status().isOk())

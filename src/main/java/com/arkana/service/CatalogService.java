@@ -27,21 +27,18 @@ public class CatalogService {
   private final LocalizedSpreadCatalogService localizedSpreads;
 
   @Transactional(readOnly = true)
-  public List<TarotCardResponse> cards(UUID userId, String deckMode, String deckId, String locale) {
+  public List<TarotCardResponse> cards(
+      UUID userId,
+      ReadingDeckMode deckMode,
+      String deckId,
+      String locale) {
     access.requireAccess(userId);
     String normalizedLocale = locale(locale);
     // TODO(multi-deck): drop this default once the frontend always sends
     // deckId (see Deck.DEFAULT_DECK_ID for the rest of the compatibility
     // window this belongs to).
     String normalizedDeckId = deckId == null ? Deck.DEFAULT_DECK_ID : deckId;
-    ReadingDeckMode normalizedMode;
-    try {
-      normalizedMode = deckMode == null
-          ? ReadingDeckMode.FULL
-          : ReadingDeckMode.valueOf(deckMode);
-    } catch (IllegalArgumentException exception) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deckMode must be FULL or MAJOR.");
-    }
+    ReadingDeckMode normalizedMode = deckMode == null ? ReadingDeckMode.FULL : deckMode;
     List<TarotCard> rows = normalizedMode == ReadingDeckMode.MAJOR
         ? cards.findAllByDeckIdAndSuitOrderByCardNumberAsc(normalizedDeckId, TarotCard.MAJOR_SUIT)
         : cards.findAllByDeckIdOrderBySuitAscCardNumberAsc(normalizedDeckId);
