@@ -166,6 +166,30 @@ the provider only for new checkouts. The provider used to create a paid
 subscription is persisted, so cancellation, plan changes, and webhooks keep
 using that provider after a configuration change.
 
+## Local QA accounts for billing/credits states
+
+`BillingPanel` (`arkana-web`) renders a different `kind` depending on the
+account's `billing_accounts.status` and related rows. Auth still goes through
+the real hosted Supabase project (no local Supabase instance), so each account
+below is signed up for real through the local app and then pushed into its
+target state directly in the local Postgres `arkana` database.
+
+| `kind` | Test user | Notes |
+| --- | --- | --- |
+| `trialing-no-card` | `cocomole+2@gmail.com` | default state right after signup, no DB change needed |
+| `trialing-scheduled` | `cocomole+trialcard@gmail.com` | trial + card on file, first charge scheduled |
+| `active` (monthly) | `cocomole+mensal@gmail.com` | `status=ACTIVE`, monthly plan |
+| `active` (annual) | `cocomole+anual@gmail.com` | `status=ACTIVE`, annual plan |
+| `cancel-scheduled` | `cocomole+cancelado@gmail.com` | `status=CANCEL_AT_PERIOD_END` |
+| `past-due` | `cocomole+pendente@gmail.com` | `status=PAST_DUE` |
+| `pending-payment` | `cocomole+confirmando@gmail.com` | `status=PENDING_PAYMENT` |
+| `courtesy` | `cocomole+cortesia@gmail.com` | active row in `billing_access_overrides`, no paid period |
+| `no-plan` | `cocomole+semplano@gmail.com` | `status=EXPIRED`/`CANCELED`, no active override |
+
+Credit-panel states (balance/history) are layered on top of these same
+accounts by inserting rows into `ai_credit_ledger` — no extra test users
+needed for that dimension.
+
 During an active trial, Asaas can create a recurring card subscription with
 its first charge scheduled for `trialEndsAt`. The Arkana account remains
 `TRIALING` until a confirmed payment webhook arrives. AbacatePay remains
