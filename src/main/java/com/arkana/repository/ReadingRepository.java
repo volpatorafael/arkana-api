@@ -81,4 +81,6 @@ public interface ReadingRepository extends JpaRepository<Reading, UUID>, JpaSpec
         and reading.status = com.arkana.domain.ReadingStatus.COMPLETED
       """)
   List<UUID> findCompletedOwnerIds(@Param("ownerIds") Collection<UUID> ownerIds);
+
+  long countByOwnerId(UUID ownerId);
 }

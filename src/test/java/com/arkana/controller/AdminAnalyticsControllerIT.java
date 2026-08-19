@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -92,7 +93,8 @@ class AdminAnalyticsControllerIT extends BaseControllerIT {
       "/v1/admin/analytics/identity",
       "/v1/admin/decks",
       "/v1/admin/decks/rider-waite",
-      "/v1/admin/decks/rider-waite/cards"
+      "/v1/admin/decks/rider-waite/cards",
+      "/v1/admin/users"
   })
   void rejectsAuthenticatedNonAdministratorFromEveryEndpoint(String endpoint) throws Exception {
     Profile regularUser = profiles.saveAndFlush(TestDataGenerator.randomProfile().build());
@@ -139,6 +141,11 @@ class AdminAnalyticsControllerIT extends BaseControllerIT {
     mockMvcPerform(put("/v1/admin/decks/rider-waite/cards/the-fool")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"namePtBr\":\"Hacked\",\"nameEn\":\"Hacked\",\"descriptionPtBr\":\"x\",\"descriptionEn\":\"x\",\"lightPtBr\":\"x\",\"lightEn\":\"x\",\"shadowPtBr\":\"x\",\"shadowEn\":\"x\"}")
+            .with(authenticatedAs(regularUser)))
+        .andExpect(status().isForbidden());
+
+    // DELETE user
+    mockMvcPerform(delete("/v1/admin/users/" + UUID.randomUUID())
             .with(authenticatedAs(regularUser)))
         .andExpect(status().isForbidden());
   }

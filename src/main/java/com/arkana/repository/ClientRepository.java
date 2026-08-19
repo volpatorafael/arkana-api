@@ -31,4 +31,6 @@ public interface ClientRepository extends JpaRepository<Client, UUID> {
 
   @Query("select distinct client.ownerId from Client client where client.ownerId in :ownerIds")
   List<UUID> findDistinctOwnerIdsWithClients(@Param("ownerIds") Collection<UUID> ownerIds);
+
+  long countByOwnerId(UUID ownerId);
 }
