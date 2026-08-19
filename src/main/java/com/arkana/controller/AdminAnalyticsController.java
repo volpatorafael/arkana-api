@@ -18,12 +18,12 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/v1/admin")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'MARKETING', 'SUPPORT', 'FINANCE')")
 public class AdminAnalyticsController {
   private final AdminAnalyticsService analytics;
   private final IdentityAnalyticsService identityAnalytics;
 
   @GetMapping("/session")
-  @PreAuthorize("hasAnyRole('ADMIN', 'MARKETING', 'SUPPORT', 'FINANCE')")
   ResponseEntity<Void> session() {
     return ResponseEntity.noContent().build();
   }

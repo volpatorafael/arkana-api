@@ -31,6 +31,8 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasKey;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,7 +89,10 @@ class AdminAnalyticsControllerIT extends BaseControllerIT {
   @CsvSource({
       "/v1/admin/session",
       "/v1/admin/analytics/overview",
-      "/v1/admin/analytics/identity"
+      "/v1/admin/analytics/identity",
+      "/v1/admin/decks",
+      "/v1/admin/decks/rider-waite",
+      "/v1/admin/decks/rider-waite/cards"
   })
   void rejectsAuthenticatedNonAdministratorFromEveryEndpoint(String endpoint) throws Exception {
     Profile regularUser = profiles.saveAndFlush(TestDataGenerator.randomProfile().build());
@@ -101,6 +106,41 @@ class AdminAnalyticsControllerIT extends BaseControllerIT {
         .andExpect(status().isForbidden())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.status").value(403));
+  }
+
+  @Test
+  void rejectsAuthenticatedNonAdministratorFromDeckCreateAndCardMutations() throws Exception {
+    Profile regularUser = profiles.saveAndFlush(TestDataGenerator.randomProfile().build());
+    LocalDate today = LocalDate.now(ZoneOffset.UTC);
+
+    // POST /decks
+    mockMvcPerform(post("/v1/admin/decks")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"id\":\"test-deck\",\"namePtBr\":\"Test\",\"nameEn\":\"Test\",\"displayOrder\":99}")
+            .with(authenticatedAs(regularUser)))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+    // PUT /decks/{id}
+    mockMvcPerform(put("/v1/admin/decks/rider-waite")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"namePtBr\":\"Hacked\"}")
+            .with(authenticatedAs(regularUser)))
+        .andExpect(status().isForbidden());
+
+    // POST /decks/{id}/cards
+    mockMvcPerform(post("/v1/admin/decks/rider-waite/cards")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"id\":\"hack-card\",\"number\":99,\"suit\":\"major\",\"imagePath\":\"x.png\",\"namePtBr\":\"x\",\"nameEn\":\"x\",\"descriptionPtBr\":\"x\",\"descriptionEn\":\"x\",\"lightPtBr\":\"x\",\"lightEn\":\"x\",\"shadowPtBr\":\"x\",\"shadowEn\":\"x\"}")
+            .with(authenticatedAs(regularUser)))
+        .andExpect(status().isForbidden());
+
+    // PUT card
+    mockMvcPerform(put("/v1/admin/decks/rider-waite/cards/the-fool")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"namePtBr\":\"Hacked\",\"nameEn\":\"Hacked\",\"descriptionPtBr\":\"x\",\"descriptionEn\":\"x\",\"lightPtBr\":\"x\",\"lightEn\":\"x\",\"shadowPtBr\":\"x\",\"shadowEn\":\"x\"}")
+            .with(authenticatedAs(regularUser)))
+        .andExpect(status().isForbidden());
   }
 
   @Test

@@ -18,5 +18,7 @@ public interface ReadingPositionRepository extends JpaRepository<ReadingPosition
 
   boolean existsByReadingIdAndCardId(UUID readingId, String cardId);
 
+  boolean existsByCardId(String cardId);
+
   void deleteAllByReadingId(UUID readingId);
 }
