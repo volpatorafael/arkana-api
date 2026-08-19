@@ -8,10 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface ProfileRepository extends JpaRepository<Profile, UUID> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select profile from Profile profile where profile.id = :id")
   Optional<Profile> findByIdForUpdate(@Param("id") UUID id);
+
+  @Query("select new com.arkana.repository.AdminUserEventProjection(profile.id, profile.createdAt) from Profile profile")
+  List<AdminUserEventProjection> findAllAdminProfileEvents();
 }

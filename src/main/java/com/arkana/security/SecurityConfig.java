@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -45,7 +46,10 @@ public class SecurityConfig {
   }
 
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      ObjectMapper objectMapper,
+      AdminAuthorityFilter adminAuthorityFilter) throws Exception {
     return http
         .csrf(csrf -> csrf.disable())
         .cors(Customizer.withDefaults())
@@ -77,6 +81,7 @@ public class SecurityConfig {
             HttpStatus.FORBIDDEN,
             "The authenticated user cannot perform this operation.",
             objectMapper)))
+        .addFilterAfter(adminAuthorityFilter, BearerTokenAuthenticationFilter.class)
         .build();
   }
 

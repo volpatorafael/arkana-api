@@ -16,8 +16,10 @@ spring:
           jwk-set-uri: https://gkjmdasjrapvegjywcof.supabase.co/auth/v1/.well-known/jwks.json
 
 arkana:
+  supabase:
+    url: ${SUPABASE_URL:https://gkjmdasjrapvegjywcof.supabase.co}
   cors:
-    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
   app-url: http://localhost:5173
 
 management:

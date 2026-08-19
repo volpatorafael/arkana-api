@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -56,6 +57,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(
         status,
         "The operation conflicts with an existing resource.");
+    return handleExceptionInternal(exception, problem, HttpHeaders.EMPTY, status, request);
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  ResponseEntity<Object> accessDenied(AccessDeniedException exception, WebRequest request) {
+    HttpStatus status = HttpStatus.FORBIDDEN;
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        status,
+        "The authenticated user cannot perform this operation.");
     return handleExceptionInternal(exception, problem, HttpHeaders.EMPTY, status, request);
   }
 

@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20260819-01-create-admin-user
+      author: arkana
+      preConditions:
+        onFail: MARK_RAN
+        not:
+          tableExists:
+            tableName: admin_user
+      changes:
+        - createTable:
+            tableName: admin_user
+            columns:
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >-
+              alter table admin_user add constraint admin_user_role_check
+              check (role in ('ADMIN', 'MARKETING', 'SUPPORT', 'FINANCE'))
+        - createIndex:
+            tableName: admin_user
+            indexName: admin_user_active_idx
+            columns:
+              - column:
+                  name: active
+

@@ -103,10 +103,39 @@ OAUTH2_JWK_SET_URI
 OAUTH2_AUDIENCE
 ```
 
+`SUPABASE_SECRET_KEY` is used only by the server-side identity analytics
+adapter. Prefer the current `sb_secret_...` key. Never expose it to either web
+application, place it in a `VITE_` variable, or log it. `SUPABASE_URL` is
+optional when `OAUTH2_ISSUER_URI` is configured: the adapter accepts the issuer
+URL ending in `/auth/v1` and derives the project base URL from it. The local
+profile already declares the current project URL. The adapter calls the
+Supabase Auth Admin API with short timeouts, paginates users, caches the minimal
+identity projection for 90 seconds, and returns only aggregate counts.
+
+Administrative authorization is stored in `admin_user`, not in editable JWT
+metadata. Provision Rafael and Michelle with their Supabase Auth UUIDs after
+the migration runs:
+
+```sql
+insert into admin_user (user_id, role, active)
+values
+  ('<rafael-auth-uuid>', 'ADMIN', true),
+  ('<michelle-auth-uuid>', 'MARKETING', true);
+```
+
+Changing `active` to `false` blocks the next administrative request. The API
+does not cache administrative authorization.
+
+Include `https://admin.getarkana.com` in `ARKANA_ALLOWED_ORIGINS` before the
+admin frontend is deployed. Keep the origin list environment-specific and do
+not use a wildcard with bearer-authenticated administrative routes.
+
 Optional or environment-specific variables:
 
 ```text
 ARKANA_ALLOWED_ORIGINS
+SUPABASE_URL
+SUPABASE_SECRET_KEY
 BILLING_PROVIDER
 RESEND_API_KEY
 RESEND_FROM

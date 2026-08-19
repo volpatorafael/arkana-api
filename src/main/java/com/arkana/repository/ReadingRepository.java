@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,4 +54,31 @@ public interface ReadingRepository extends JpaRepository<Reading, UUID>, JpaSpec
   Optional<Reading> findByIdAndOwnerIdForUpdate(
       @Param("id") UUID id,
       @Param("ownerId") UUID ownerId);
+
+  @Query("""
+      select new com.arkana.repository.AdminUserEventProjection(reading.ownerId, reading.updatedAt)
+      from Reading reading
+      where reading.updatedAt >= :from and reading.updatedAt < :to
+      """)
+  List<AdminUserEventProjection> findAdminActivityEvents(
+      @Param("from") OffsetDateTime from,
+      @Param("to") OffsetDateTime to);
+
+  @Query("""
+      select new com.arkana.repository.AdminUserEventProjection(reading.ownerId, reading.completedAt)
+      from Reading reading
+      where reading.status = com.arkana.domain.ReadingStatus.COMPLETED
+        and reading.completedAt >= :from and reading.completedAt < :to
+      """)
+  List<AdminUserEventProjection> findAdminCompletedEvents(
+      @Param("from") OffsetDateTime from,
+      @Param("to") OffsetDateTime to);
+
+  @Query("""
+      select reading.ownerId
+      from Reading reading
+      where reading.ownerId in :ownerIds
+        and reading.status = com.arkana.domain.ReadingStatus.COMPLETED
+      """)
+  List<UUID> findCompletedOwnerIds(@Param("ownerIds") Collection<UUID> ownerIds);
 }

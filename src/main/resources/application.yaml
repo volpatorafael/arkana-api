@@ -23,6 +23,9 @@ spring:
           jws-algorithms: ES256
 
 arkana:
+  supabase:
+    url: ${SUPABASE_URL:${OAUTH2_ISSUER_URI:}}
+    secret-key: ${SUPABASE_SECRET_KEY:}
   billing:
     provider: ${BILLING_PROVIDER:ASAAS}
   resend:
